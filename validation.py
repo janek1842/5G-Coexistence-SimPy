@@ -327,9 +327,6 @@ def coexistence_rs():
         coex5g_eff_wifi = coex5g.groupby(['WiFi'])['ChannelEfficiencyWiFi'].mean()
         matlab_eff_wifi = matlab.groupby(['nWifi'])['effWifi'].mean()
 
-
-
-
         coex5g_cot_nru = coex5g.groupby(['Gnb'])['ChannelOccupancyNR'].mean()
         matalb_cot_nru = matlab.groupby(['nLAA'])['cotLAA'].mean()
 

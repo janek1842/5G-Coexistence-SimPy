@@ -365,7 +365,7 @@ def print_coex():
 
     viridis(0.0, 1.0, 4)
 
-    data_my = pd.read_csv('coex_gnb_wifi_RS.csv', delimiter=',')
+    data_my = pd.read_csv('output_test.csv', delimiter=',')
 
     data_my_wifi = data_my.groupby(['Gnb'])['ChannelOccupancy'].mean()
     data_my_gnb = data_my.groupby(['Gnb'])['ChannelOccupancyNR'].mean()

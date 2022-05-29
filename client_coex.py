@@ -46,7 +46,7 @@ if __name__ == "__main__":
     print(list)
 
     for var in list:
-        for k in range(1, 9):
+        for k in range(1, 2):
         #for var in list:
         # k = 4
             single_run(seeds=var, stations_number=k, gnb_number=k, simulation_time=100, payload_size=1472, cw_min=15,
