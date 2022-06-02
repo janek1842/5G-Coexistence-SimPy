@@ -44,8 +44,8 @@ def print_airtime_34():
     # read data from csv
     viridis(0.0, 1.0, 4)
 
-    data = pd.read_csv('airtime34.csv', delimiter=',')
-    data_dcf = pd.read_csv('DCF_airtime34.csv', delimiter=',')
+    data = pd.read_csv('output_test.csv', delimiter=',')
+    data_dcf = pd.read_csv('output_test.csv', delimiter=',')
     # data2 = pd.read_csv('results2.csv', delimiter=',')
 
     # group by number of stations and calculate mean colision proob
@@ -82,8 +82,8 @@ def print_channel_occupancy():
     viridis(0.2, 1.0, 2)
 
     # read data from csv
-    data = pd.read_csv('airtime34.csv', delimiter=',')
-    data_dcf = pd.read_csv('DCF_airtime34.csv', delimiter=',')
+    data = pd.read_csv('output_test.csv', delimiter=',')
+    data_dcf = pd.read_csv('output_test.csv', delimiter=',')
     # data2 = pd.read_csv('results2.csv', delimiter=',')
 
     # group by number of stations and calculate mean colision proob
@@ -114,8 +114,8 @@ def print_channel_efficency():
     viridis(0.2, 1.0, 2)
 
     # read data from csv
-    data = pd.read_csv('airtime34.csv', delimiter=',')
-    data_dcf = pd.read_csv('DCF_airtime34.csv', delimiter=',')
+    data = pd.read_csv('output_test.csv', delimiter=',')
+    data_dcf = pd.read_csv('output_test.csv', delimiter=',')
     # data2 = pd.read_csv('results2.csv', delimiter=',')
 
     # group by number of stations and calculate mean colision proob
@@ -322,7 +322,7 @@ def print_coexistance_airtime():
     # read data from csv
     viridis(0.0, 1.0, 2)
 
-    data = pd.read_csv('matlab_coex4.csv', delimiter=',')
+    data = pd.read_csv('matlab_results.csv', delimiter=',')
     # group by number of stations and calculate mean colision proob
     data3 = data.groupby(['nNR'])['cotWifi'].mean()
     data2 = data.groupby(['nNR'])['cotNR'].mean()
@@ -500,7 +500,8 @@ def valid_wifi():
 
 if __name__ == "__main__":
     #print_collision_prob()
-    print_airtime_34()
+    #print_airtime_34()
+    print_coexistance_airtime()
     #print_airtime_norm_per_station()
     #print_airtime_per_station()
     #print_channel_occupancy()

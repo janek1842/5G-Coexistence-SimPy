@@ -1,6 +1,4 @@
-
 from coexistanceSimpy.Coexistence import *
-
 
 def single_run(
         seeds: int,
@@ -24,10 +22,6 @@ def single_run(
                    Config(payload_size, cw_min, cw_max, r_limit, mcs_value),
                    Config_NR(16, 9, 1000, 1000, 0, 3, cw_min, cw_max, 6),
                    backoffs, airtime_data, airtime_control, airtime_data_NR, airtime_control_NR)
-
-
-
-
 
 if __name__ == "__main__":
     #  running diferent scenarios of simulation

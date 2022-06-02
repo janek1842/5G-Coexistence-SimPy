@@ -892,9 +892,9 @@ def run_simulation(
         write_header = False
     with open(output_csv, mode='a', newline="") as result_file:
         result_adder = csv.writer(result_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-
+        firstliner="Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcolWifi,ChannelOccupancyNR,ChannelEfficiencyNR,PcolNR,ChannelOccupancyAll,ChannelEfficiencyAll"
         if write_header:
-            result_adder.writerow(["Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcolWifi,ChannelOccupancyNR,ChannelEfficiencyNR,PcolNR,ChannelOccupancyAll,ChannelEfficiencyAll"])
+            result_adder.writerow([firstliner])
 
         result_adder.writerow(
             [seed, number_of_stations, number_of_gnb, normalized_channel_occupancy_time, normalized_channel_efficiency,

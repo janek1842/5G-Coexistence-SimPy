@@ -385,8 +385,8 @@ def coexistence_rs_pcol():
 def coexistence_gap():
     viridis(0.0, 1.0, 6)
 
-    coex5g = pd.read_csv('val/coex/coex5g_coexistence_gap_63.csv', delimiter=',')
-    matlab = pd.read_csv('val/coex/matlab_coexistence_gap_63v2.csv', delimiter=',')
+    coex5g = pd.read_csv('val/coex/output_test.csv', delimiter=',')
+    matlab = pd.read_csv('val/coex/results.csv', delimiter=',')
 
 
     coex5g_eff_wifi = coex5g.groupby(['WiFi'])['ChannelEfficiencyWiFi'].mean()
@@ -450,6 +450,6 @@ if __name__ == "__main__":
     #valid_nru()
     # calc()
     #coex_rs()
-    coexistence_rs()
+    coexistence_gap()
 
 
