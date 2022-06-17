@@ -16,8 +16,8 @@ class Times:
 
     t_slot = 9  # [us]
     t_sifs = 16  # [us]
-    t_difs = 3 * t_slot + t_sifs  # [us]
-    ack_timeout = 45  # [us]
+
+    ack_timeout = 24  # [us]
 
     # Mac overhead
     mac_overhead = 40 * 8  # [b]
@@ -25,10 +25,13 @@ class Times:
     # ACK size
     ack_size = 14 * 8  # [b]
 
+    t_difs=0
+
     # overhead
     _overhead = 22  # [b]
 
-    def __init__(self, payload: int = 1472, mcs: int = 7):
+
+    def __init__(self, payload: int = 1472, mcs: int = 7, aifsn: int = 3):
         self.payload = payload
         self.mcs = mcs
         # OFDM parameters
@@ -40,9 +43,12 @@ class Times:
         self.n_ctr = 4 * self.phy_ctr_rate  # [b/symbol]
         self.data_rate = MCS[mcs][0]  # [b/us]
         self.ctr_rate = MCS[mcs][1]  # [b/us]
-
         self.ofdm_preamble = 16  # [us]
         self.ofdm_signal = 24 / self.ctr_rate  # [us]
+        self.aifsn = aifsn
+        t_slot = 9  # [us]
+        t_sifs = 16  # [us]
+        self.t_difs = aifsn * t_slot + t_sifs  # [us]
 
     # Data frame time
     def get_ppdu_frame_time(self):
@@ -66,7 +72,7 @@ class Times:
         ack = self.ofdm_preamble + self.ofdm_signal + ack / self.ctr_rate  # [us]
         ack_tx_time = Times.t_sifs + ack
         # return math.ceil(ack_tx_time)  # [us]
-        return 44
+        return 24
 
     # # ACK Timeout
     # def get_ack_timeout():

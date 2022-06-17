@@ -1,4 +1,16 @@
+# Ignored files
 /coexistanceSimpy/ProperFunctions.py
 /airtime.txt
 /results/
-
+*.xml
+*.csv
+csvresults
+/csvresults
+*.pyc
+.idea\*
+*.csv
+*.csv
+csvresults/ns3_throughput_results.csv
+*.xml
+csvresults/ns3_throughput_size.csv
+*.csv

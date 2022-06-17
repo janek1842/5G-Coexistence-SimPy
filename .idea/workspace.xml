@@ -5,11 +5,15 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="35cf391d-db4b-490a-ba6b-3b7f89505c03" name="Changes" comment="">
-      <change afterPath="$PROJECT_DIR$/matlab_results.csv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/csvresults/ns3_throughput_results.csv" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/csvresults/ns3_throughput_size.csv" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/client_coex.py" beforeDir="false" afterPath="$PROJECT_DIR$/client_coex.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/coexistanceSimpy/Coexistence.py" beforeDir="false" afterPath="$PROJECT_DIR$/coexistanceSimpy/Coexistence.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/coexistanceSimpy/Times.py" beforeDir="false" afterPath="$PROJECT_DIR$/coexistanceSimpy/Times.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/output_test.csv" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/resultAnalysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/resultAnalysis.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/validation.py" beforeDir="false" afterPath="$PROJECT_DIR$/validation.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -25,10 +29,11 @@
     <option name="showLibraryContents" value="true" />
   </component>
   <component name="PropertiesComponent">
+    <property name="ASKED_MARK_IGNORED_FILES_AS_EXCLUDED" value="true" />
     <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
     <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
     <property name="WebServerToolWindowFactoryState" value="false" />
-    <property name="last_opened_file_path" value="$PROJECT_DIR$" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../../../Pulpit/PRACA_INŻ/Symulatory/nru-channel-access-master" />
     <property name="node.js.detected.package.eslint" value="true" />
     <property name="node.js.detected.package.tslint" value="true" />
     <property name="node.js.selected.package.eslint" value="(autodetect)" />
@@ -44,7 +49,7 @@
       <recent name="C:\Users\janfi\OneDrive\Dokumenty\GitHub\5G-Coexistence-SimPy" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.client_coex">
+  <component name="RunManager" selected="Python.resultAnalysis">
     <configuration name="5G-Coexistence-SimPy" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -164,8 +169,8 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.client_coex" />
         <item itemvalue="Python.resultAnalysis" />
+        <item itemvalue="Python.client_coex" />
         <item itemvalue="Python.5G-Coexistence-SimPy" />
         <item itemvalue="Python.validation" />
         <item itemvalue="Python.Coexistence" />
@@ -188,6 +193,11 @@
       <workItem from="1654123665617" duration="511000" />
       <workItem from="1654124183839" duration="2341000" />
       <workItem from="1654200696766" duration="151000" />
+      <workItem from="1654200851764" duration="26428000" />
+      <workItem from="1654813819150" duration="3535000" />
+      <workItem from="1654844522377" duration="593000" />
+      <workItem from="1654980309792" duration="24885000" />
+      <workItem from="1655496826179" duration="593000" />
     </task>
     <servers />
   </component>
@@ -208,8 +218,8 @@
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/5G_Coexistence_SimPy$Coexistence.coverage" NAME="Coexistence Coverage Results" MODIFIED="1653518248613" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/coexistanceSimpy" />
-    <SUITE FILE_PATH="coverage/5G_Coexistence_SimPy$client_coex.coverage" NAME="client_coex Coverage Results" MODIFIED="1654200711150" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/5G_Coexistence_SimPy$client_coex.coverage" NAME="client_coex Coverage Results" MODIFIED="1655033250809" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/5G_Coexistence_SimPy$validation.coverage" NAME="validation Coverage Results" MODIFIED="1653867178335" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/5G_Coexistence_SimPy$resultAnalysis.coverage" NAME="resultAnalysis Coverage Results" MODIFIED="1654125512944" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/5G_Coexistence_SimPy$resultAnalysis.coverage" NAME="resultAnalysis Coverage Results" MODIFIED="1655033758850" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

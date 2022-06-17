@@ -12,7 +12,7 @@ from typing import Dict, List
 from .Times import *
 from datetime import datetime
 
-output_csv = "output_test.csv"
+output_csv = "csvresults/edca_simulation.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
 
 typ_filename = "RS_coex_1sta_1wifi2.log"
@@ -42,14 +42,14 @@ gap = True
 class Channel_occupied(Exception):
     pass
 
-
 @dataclass()
 class Config:
-    data_size: int = 1472  # size od payload in b
+    data_size: int = 1472 # size od payload in b
     cw_min: int = 15  # min cw window size
-    cw_max: int = 63  # max cw window size 1023 def
+    cw_max: int = 1023  # max cw window size 1023 def
     r_limit: int = 7
     mcs: int = 7
+    aifsn: int = 3
 
 
 @dataclass()
@@ -94,7 +94,7 @@ class Station:
             config: Config = Config(),
     ):
         self.config = config
-        self.times = Times(config.data_size, config.mcs)  # using Times script to get time calculations
+        self.times = Times(config.data_size, config.mcs,config.aifsn)  # using Times script to get time calculations
         self.name = name  # name of the station
         self.env = env  # simpy environment
         self.col = random.choice(colors)  # color of output -- for future station distinction
@@ -132,7 +132,7 @@ class Station:
             try:
                 with self.channel.tx_lock.request() as req:  # waiting  for idle channel -- empty channel
                     yield req
-                self.back_off_time += Times.t_difs  # add DIFS time
+                self.back_off_time += self.times.t_difs  # add DIFS time
                 log(self, f"Starting to wait backoff (with DIFS): ({self.back_off_time})u...")
                 self.first_interrupt = True
                 start = self.env.now  # store the current simulation time
@@ -150,19 +150,19 @@ class Station:
                     #tak jest po mojemu:
                     log(self, "Waiting was interrupted, waiting to resume backoff...")
                     all_waited = self.env.now - start
-                    if all_waited <= Times.t_difs:
-                        self.back_off_time -= Times.t_difs
-                        log(self, f"Interupted in DIFS ({Times.t_difs}), backoff {self.back_off_time}")
+                    if all_waited <= self.times.t_difs:
+                        self.back_off_time -= self.times.t_difs
+                        log(self, f"Interupted in DIFS ({self.times.t_difs}), backoff {self.back_off_time}")
                     else:
-                        back_waited = all_waited - Times.t_difs
-                        slot_waited = int(back_waited / Times.t_slot)
-                        self.back_off_time -= ((slot_waited * Times.t_slot) + Times.t_difs)
+                        back_waited = all_waited - self.times.t_difs
+                        slot_waited = int(back_waited / self.times.t_slot)
+                        self.back_off_time -= ((slot_waited * self.times.t_slot) + self.times.t_difs)
                         # self.back_off_time -= (self.env.now - start)  # set the Back Off to the remaining one
                         #self.back_off_time -= 9  # simulate the delay of sensing the channel state
                         log(self,
-                            f"Completed slots(9us) {slot_waited} = {(slot_waited * Times.t_slot)}  plus DIFS time {Times.t_difs}")
+                            f"Completed slots(9us) {slot_waited} = {(slot_waited * self.times.t_slot)}  plus DIFS time {self.times.t_difs}")
                         log(self,
-                            f"Backoff decresed by {((slot_waited * Times.t_slot) + Times.t_difs)} new Backoff {self.back_off_time}")
+                            f"Backoff decresed by {((slot_waited * self.times.t_slot) + self.times.t_difs)} new Backoff {self.back_off_time}")
                     self.first_interrupt = False
 
                     # log(self, "Waiting was interrupted, waiting to resume backoff...")
@@ -227,6 +227,7 @@ class Station:
 
                 if was_sent:  # transmission successful
                     self.channel.airtime_control[self.name] += self.times.get_ack_frame_time()
+
                     yield self.env.timeout(self.times.get_ack_frame_time())  # wait ack
                     self.channel.tx_list.clear()  # clear transmitting list
                     self.channel.tx_list_NR.clear()
@@ -276,8 +277,7 @@ class Station:
         return back_off * self.times.t_slot
 
     def generate_new_frame(self):
-        # frame_length = self.times.get_ppdu_frame_time()
-        frame_length = 5400
+        frame_length = self.times.get_ppdu_frame_time()
         return Frame(frame_length, self.name, self.col, self.config.data_size, self.env.now)
 
     def sent_failed(self):
@@ -755,8 +755,21 @@ class Transmission_NR:
     collided: bool = False  # true if transmission colided with another one
 
 
+def getTimeCategories(number_of_stations,airtime_data,trafficType):
+    airtime_values=list(airtime_data.values())
+
+    if trafficType == "background":
+        return sum(airtime_values[0:number_of_stations["backgroundStations"]])
+    elif  trafficType == "bestEffort":
+        return sum(airtime_values[number_of_stations["backgroundStations"]:number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]])
+    elif  trafficType == "video":
+        return sum(airtime_values[number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]:number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+number_of_stations["videoStations"]])
+    else:
+        return sum(airtime_values[number_of_stations["backgroundStations"] + number_of_stations["bestEffortStations"] +
+                   number_of_stations["videoStations"]:])
+
 def run_simulation(
-        number_of_stations: int,
+        number_of_stations: Dict[str,int],
         number_of_gnb: int,
         seed: int,
         simulation_time: int,
@@ -773,19 +786,40 @@ def run_simulation(
     channel = Channel(
         simpy.PreemptiveResource(environment, capacity=1),
         simpy.Resource(environment, capacity=1),
-        number_of_stations,
+        sum(number_of_stations.values()),
         number_of_gnb,
         backoffs,
         airtime_data,
         airtime_control,
         airtime_data_NR,
         airtime_control_NR
+
     )
     config_nr = Config_NR()
-    # config_wifi = Config()
+    config_wifi = Config()
 
-    for i in range(1, number_of_stations + 1):
-        Station(environment, "Station {}".format(i), channel, config)
+    for i in range(1, sum(number_of_stations.values()) + 1):
+        # 1st group - Background
+        # 2nd group - Best Effort
+        # 3rd group - Video
+        # 4th group - Voice
+
+        if i in range (1,number_of_stations["backgroundStations"]+1):
+            config_local = Config(config.data_size, 15, 1023, config.r_limit, config.mcs,7)
+            Station(environment, "Station {}".format(i), channel, config_local)
+        elif i in range (number_of_stations["backgroundStations"]+1,number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+1):
+            config_local = Config(config.data_size, 15, 1023, config.r_limit, config.mcs,3)
+            Station(environment, "Station {}".format(i), channel, config_local)
+        elif i in range (number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+1,number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+number_of_stations["videoStations"]+1):
+            config_local = Config(config.data_size, 7, 15, config.r_limit, config.mcs, 2)
+            Station(environment, "Station {}".format(i), channel, config_local)
+        else:
+            config_local = Config(config.data_size, 3,7, config.r_limit, config.mcs, 2)
+            Station(environment, "Station {}".format(i), channel, config_local)
+
+        # Station(environment, "Station {}".format(i), channel, config)
+
+
 
     for i in range(1, number_of_gnb + 1):
         Gnb(environment, "Gnb {}".format(i), channel, config_nr)
@@ -793,7 +827,7 @@ def run_simulation(
     # environment.run(until=simulation_time * 1000000) 10^6 milisekundy
     environment.run(until=simulation_time * 1000000)
 
-    if number_of_stations != 0:
+    if sum(number_of_stations.values()) != 0:
         p_coll = "{:.4f}".format(
             channel.failed_transmissions / (channel.failed_transmissions + channel.succeeded_transmissions))
     else:
@@ -842,7 +876,7 @@ def run_simulation(
 
     # nodes = number_of_stations + number_of_gnb
 
-    for i in range(1, number_of_stations + 1):
+    for i in range(1, sum(number_of_stations.values()) + 1):
         channel_occupancy_time += channel.airtime_data["Station {}".format(i)] + channel.airtime_control[
             "Station {}".format(i)]
         channel_efficiency += channel.airtime_data["Station {}".format(i)]
@@ -866,15 +900,28 @@ def run_simulation(
     normalized_channel_efficiency_all = (channel_efficiency + channel_efficiency_NR) / time
     # print(f'All occupancy: {normalized_channel_occupancy_time_all}')
     # print(f'All efficieny: {normalized_channel_efficiency_all}')
+    throughput=(channel.succeeded_transmissions * config.data_size * 8) / (simulation_time * 1000000)
+    jain_fair_index= pow(sum(airtime_data.values()),2) / ( 10 * sum({k: pow(v,2) for k,v in airtime_data.items()}.values()))
+
+    beAirTime = getTimeCategories(number_of_stations,airtime_data,"bestEffort")
+    vdAirTime = getTimeCategories(number_of_stations,airtime_data,"video")
+    vcAirTime = getTimeCategories(number_of_stations,airtime_data,"voice")
+    bgAirTime = getTimeCategories(number_of_stations,airtime_data,"background")
+
+
+    print(beAirTime,bgAirTime,vdAirTime,vcAirTime)
 
     print(
-        f"SEED = {seed} N_stations:={number_of_stations} N_gNB:={number_of_gnb}  CW_MIN = {config.cw_min} CW_MAX = {config.cw_max} "
+        f"SEED = {seed} N_stations:={sum(number_of_stations.values())} N_gNB:={number_of_gnb}  CW_MIN = {config.cw_min} CW_MAX = {config.cw_max} "
         f"WiFi pcol:={p_coll} WiFi cot:={normalized_channel_occupancy_time} WiFi eff:={normalized_channel_efficiency} "
         f"gNB pcol:={p_coll_NR} gNB cot:={normalized_channel_occupancy_time_NR} gNB eff:={normalized_channel_efficiency_NR} "
         f" all cot:={normalized_channel_occupancy_time_all} all eff:={normalized_channel_efficiency_all}"
     )
     print(f" Wifi succ: {channel.succeeded_transmissions} fail: {channel.failed_transmissions}")
     print(f" NR succ: {channel.succeeded_transmissions_NR} fail: {channel.failed_transmissions_NR}")
+    print("WiFi throughput", (channel.succeeded_transmissions * config.data_size * 8) / (simulation_time * 1000000))
+    print("payload:",config.data_size)
+
 
     # with open("val/coex/check/coex_gap_be_newPcol.csv", mode='a', newline="") as result_file:
     #     result_adder = csv.writer(result_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
@@ -887,18 +934,21 @@ def run_simulation(
     #          normalized_channel_occupancy_time_NR, normalized_channel_efficiency_NR, p_coll_NR,
     #          normalized_channel_occupancy_time_all, normalized_channel_efficiency_all])
 
+
+
     write_header = True
     if os.path.isfile(output_csv):
         write_header = False
     with open(output_csv, mode='a', newline="") as result_file:
         result_adder = csv.writer(result_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        firstliner="Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcolWifi,ChannelOccupancyNR,ChannelEfficiencyNR,PcolNR,ChannelOccupancyAll,ChannelEfficiencyAll"
+        firstliner='Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcolWifi,ChannelOccupancyNR,ChannelEfficiencyNR,PcolNR,ChannelOccupancyAll,ChannelEfficiencyAll,Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime'
+        # VideoAirTime, VoiceAirTime, BestEffortAirTime
         if write_header:
             result_adder.writerow([firstliner])
 
         result_adder.writerow(
-            [seed, number_of_stations, number_of_gnb, normalized_channel_occupancy_time, normalized_channel_efficiency,
+            [seed, sum(number_of_stations.values()), number_of_gnb, normalized_channel_occupancy_time, normalized_channel_efficiency,
              p_coll,
              normalized_channel_occupancy_time_NR, normalized_channel_efficiency_NR, p_coll_NR,
-             normalized_channel_occupancy_time_all, normalized_channel_efficiency_all])
+             normalized_channel_occupancy_time_all, normalized_channel_efficiency_all,throughput,config.data_size,simulation_time,jain_fair_index,beAirTime,vdAirTime,vcAirTime,bgAirTime])
 

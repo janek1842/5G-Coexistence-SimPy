@@ -281,9 +281,6 @@ def print_nru_airtime_gap():
     # group by number of stations and calculate mean colision proob
     data3 = data.groupby(['Gnb'])['ChannelEfficiency'].mean()
 
-
-
-
     # plotting
     # 5G _ JC
     ax2 = data3.plot(title='NR-U gap airtime', marker='o', legend=True, ylim=(0.8, 1))
@@ -492,16 +489,93 @@ def valid_wifi():
     plt.tight_layout()
     plt.savefig('results/coex_comparison_gap3.png')
 
+def valid_throughput():
+    viridis(0.0, 1.0, 2)
 
+    throughput = pd.read_csv('csvresults/output_throughput.csv', delimiter=',')
+    ns3 = pd.read_csv('csvresults/ns3_throughput_results.csv', delimiter=',')
 
+    #matlab = pd.read_csv('da/matlab_wifi.csv', delimiter=',')
 
+    throughput = throughput.groupby(['WiFi'])['Throughput'].mean()
+    ns3 = ns3.groupby(['WiFi'])['Throughput'].mean()
 
+    ax1 = throughput.plot(title=' Aggregated Throughput', marker='o', legend=True, ylim=(0, 40))
+    ax2 = ns3.plot(title=' Aggregated Throughput', marker='x', legend=True, ylim=(0, 40))
 
+    ax1.legend(['Coex_wifi',"ns-3"])
+    ax1.set_xlabel('Number of Wifi nodes', fontsize=14)
+    ax1.set_ylabel('Aggregated Throughput [Mb/s]', fontsize=14)
+
+    plt.tight_layout()
+    plt.savefig('results/_results_throughput.png')
+
+def valid_throughput_and_size():
+    viridis(0.0, 1.0, 2)
+
+    throughput = pd.read_csv('csvresults/output_throughput_size.csv', delimiter=',')
+    ns3 = pd.read_csv('csvresults/ns3_throughput_size.csv', delimiter=',')
+
+    #matlab = pd.read_csv('da/matlab_wifi.csv', delimiter=',')
+
+    throughput = throughput.groupby(['Payload'])['Throughput'].mean()
+    ns3 = ns3.groupby(['Payload'])['Throughput'].mean()
+
+    ax1 = throughput.plot(title=' Aggregated Throughput', marker='o', legend=True, ylim=(0, 40))
+    ax2 = ns3.plot(title=' Aggregated Throughput', marker='x', legend=True, ylim=(0, 40))
+
+    ax1.legend(['Coex_wifi',"ns-3"])
+    ax1.set_xlabel('Payload size [B]', fontsize=14)
+    ax1.set_ylabel('Aggregated Throughput [Mb/s]', fontsize=14)
+
+    plt.tight_layout()
+    plt.savefig('results/_results_throughput_size.png')
+
+def valid_fair_index():
+    viridis(0.0, 1.0, 2)
+
+    throughput = pd.read_csv('csvresults/jain_fairness.csv', delimiter=',')
+
+    throughput = throughput.groupby(['SimulationTime'])['JainFairIndex'].mean()
+
+    ax1 = throughput.plot(marker='o', legend=True, ylim=(0.92, 1.01))
+
+    ax1.legend(['Coex_wifi_v2'])
+    ax1.set_xlabel('Simulation time [s]', fontsize=14)
+    ax1.set_ylabel('Jain\'s fairness index', fontsize=14)
+
+    plt.tight_layout()
+    plt.savefig('results/jain_fairness_index.png')
+
+def valid_airtime_data():
+    viridis(0.0, 1.0, 2)
+
+    edca = pd.read_csv('csvresults/edca_simulation.csv', delimiter=',')
+
+    airtime_be = edca.groupby(['WiFi'])['beAirTime'].mean()
+    airtime_bg = edca.groupby(['WiFi'])['bgAirTime'].mean()
+    airtime_vd = edca.groupby(['WiFi'])['vdAirTime'].mean()
+    airtime_vo = edca.groupby(['WiFi'])['vcAirTime'].mean()
+
+    ax1 = airtime_be.plot(marker='o', legend=True)
+    ax2 = airtime_bg.plot(ax=ax1,marker='o', legend=True)
+    ax3 = airtime_vd.plot(ax=ax2,marker='o', legend=True)
+    ax4 = airtime_vo.plot(ax=ax3,marker='o', legend=True)
+
+    ax4.legend(['BestEffort',"Background","Video","Voice"])
+    ax4.set_xlabel('Number of stations (summarized)', fontsize=14)
+    ax4.set_ylabel('Airtime data [s]', fontsize=14)
+
+    plt.tight_layout()
+    plt.savefig('results/edca_simulations.png')
 
 if __name__ == "__main__":
+    #valid_throughput_and_size()
+    #valid_fair_index()
+    valid_airtime_data()
     #print_collision_prob()
     #print_airtime_34()
-    print_coexistance_airtime()
+    #print_coexistance_airtime()
     #print_airtime_norm_per_station()
     #print_airtime_per_station()
     #print_channel_occupancy()
