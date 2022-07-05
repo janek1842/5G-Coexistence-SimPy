@@ -14,3 +14,4 @@ csvresults/ns3_throughput_results.csv
 *.xml
 csvresults/ns3_throughput_size.csv
 *.csv
+__pycache__/.

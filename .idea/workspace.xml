@@ -5,11 +5,7 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="35cf391d-db4b-490a-ba6b-3b7f89505c03" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/client_coex.py" beforeDir="false" afterPath="$PROJECT_DIR$/client_coex.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/coexistanceSimpy/Coexistence.py" beforeDir="false" afterPath="$PROJECT_DIR$/coexistanceSimpy/Coexistence.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/matlab_results.csv" beforeDir="false" />
-      <change beforePath="$PROJECT_DIR$/resultAnalysis.py" beforeDir="false" afterPath="$PROJECT_DIR$/resultAnalysis.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
@@ -218,7 +214,7 @@
       <workItem from="1655723488892" duration="5675000" />
       <workItem from="1655744632401" duration="4565000" />
       <workItem from="1656872581456" duration="5981000" />
-      <workItem from="1657047540905" duration="597000" />
+      <workItem from="1657047540905" duration="706000" />
     </task>
     <servers />
   </component>
