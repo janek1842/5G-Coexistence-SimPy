@@ -14,7 +14,7 @@ from typing import Dict, List
 from .Times import *
 from datetime import datetime
 
-output_csv = "csvresults/peak_simulation.csv"
+output_csv = "csvresults/TESTS/test1.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
 
 typ_filename = "RS_coex_1sta_1wifi2.log"
@@ -146,23 +146,16 @@ class Station:
         self.poisson_lambda = poisson_lambda
         self.Queue = []
 
-    def olle(self):
-        # print("env.now() przed env.timeout",self.env.now)
-        # print("timeout [s]",self.sumTime)
-        # self.myflag = False
+    def wait_for_frame(self):
         yield self.env.timeout(self.sumTime)
-        # print("env.now() po env.timeout", self.env.now)
-        # self.myflag=True
         self.start_generating()
 
     def start_generating(self):
         self.sumTime = numpy.random.exponential(1/self.poisson_lambda)*1000
-        # print(self.env.now)
-        # print("kolejka",self.Queue)
         if (len(self.Queue) < 3):
             self.Queue.append(1)
             self.frame_to_send = self.generate_new_frame()
-        self.myself = self.env.process(self.olle())
+        self.myself = self.env.process(self.wait_for_frame())
 
     def start(self):
         # self.frameGenerator = FrameGenerator(self.Queue,self.poisson_lambda)
@@ -174,16 +167,16 @@ class Station:
         #     self.frame_to_send = self.generate_new_frame()
         #     t = t + numpy.random.exponential(scale=self.scale, size=None)
         #     self.Queue.append(self.frame_to_send)
-        if(self.poisson_lambda != 100):
+        if(self.poisson_lambda is not None):
             self.start_generating()
 
         while True:
             # print(self.Queue)
-            if len(self.Queue)>0 or self.poisson_lambda == 100:
+            if len(self.Queue)>0 or self.poisson_lambda is None:
                 # print("TAK")
                 # print(self.Queue)
                 # self.frame_to_send = self.generate_new_frame()
-                if(self.poisson_lambda != 100):
+                if(self.poisson_lambda is not None):
                     self.Queue.pop(0)
                 else:
                     self.frame_to_send = self.generate_new_frame()
@@ -199,7 +192,8 @@ class Station:
                     # if(was_sent): # jesli udalo sie wyslac, usun z bufora jedną ramkę
                 # print(self.name, "aktLEN:", len(self.Queue))
             else:
-                yield self.env.timeout(big_num)
+                print("ALARM")
+                yield self.env.timeout(big_num*100000)
         # print("zerowka")
                 # self.process = None
         # print(self.name," koncowo ",len(self.Queue))
@@ -873,7 +867,7 @@ def run_simulation(
         airtime_control: Dict[str, int],
         airtime_data_NR: Dict[str, int],
         airtime_control_NR: Dict[str, int],
-        poisson_lambda: int,
+        poisson_lambda
 ):
     random.seed(seed)
     environment = simpy.Environment()
@@ -892,17 +886,17 @@ def run_simulation(
     config_nr = Config_NR()
     config_wifi = Config()
 
+
     for i in range(1, sum(number_of_stations.values()) + 1):
         # 1st group - Background
         # 2nd group - Best Effort
         # 3rd group - Video
         # 4th group - Voice
-
         if i in range (1,number_of_stations["backgroundStations"]+1):
             config_local = Config(config.data_size, 15, 1023, config.r_limit, config.mcs,7)
             Station(environment, "Station {}".format(i), channel, config_local,simulation_time,poisson_lambda)
         elif i in range (number_of_stations["backgroundStations"]+1,number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+1):
-            config_local = Config(config.data_size, 13, 13, config.r_limit, config.mcs,3)
+            config_local = Config(config.data_size, 15, 1023, config.r_limit, config.mcs,3)
             Station(environment, "Station {}".format(i), channel, config_local,simulation_time,poisson_lambda)
         elif i in range (number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+1,number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+number_of_stations["videoStations"]+1):
             config_local = Config(config.data_size, 7, 15, config.r_limit, config.mcs, 2)
@@ -912,8 +906,6 @@ def run_simulation(
             Station(environment, "Station {}".format(i), channel, config_local,simulation_time,poisson_lambda)
 
         # Station(environment, "Station {}".format(i), channel, config)
-
-
     for i in range(1, number_of_gnb + 1):
         Gnb(environment, "Gnb {}".format(i), channel, config_nr)
 

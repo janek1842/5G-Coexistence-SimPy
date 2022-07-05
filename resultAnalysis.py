@@ -492,16 +492,16 @@ def valid_wifi():
 def valid_throughput():
     viridis(0.0, 1.0, 2)
 
-    throughput = pd.read_csv('csvresults/output_throughput.csv', delimiter=',')
-    ns3 = pd.read_csv('csvresults/ns3_throughput_results.csv', delimiter=',')
+    throughput = pd.read_csv('csvresults/OTHERS/output_throughput.csv', delimiter=',')
+    ns3 = pd.read_csv('csvresults/NS3/ns3_throughput_results.csv', delimiter=',')
 
     #matlab = pd.read_csv('da/matlab_wifi.csv', delimiter=',')
 
     throughput = throughput.groupby(['WiFi'])['Throughput'].mean()
     ns3 = ns3.groupby(['WiFi'])['Throughput'].mean()
 
-    ax1 = throughput.plot(marker='o', legend=True, ylim=(0, 40))
-    ax2 = ns3.plot(marker='x', legend=True, ylim=(0, 40))
+    ax1 = throughput.plot(marker='o', legend=True, ylim=(0, 40),yerr = throughput.std(),capsize=4)
+    ax2 = ns3.plot(marker='x', legend=True, ylim=(0, 40),yerr = ns3.std(),capsize=4)
 
     ax1.legend(['Coex_wifi_v2',"ns-3"])
     ax1.set_xlabel('Number of Wi-Fi nodes', fontsize=14)
@@ -513,16 +513,16 @@ def valid_throughput():
 def valid_throughput_and_size():
     viridis(0.0, 1.0, 2)
 
-    throughput = pd.read_csv('csvresults/output_throughput_size.csv', delimiter=',')
-    ns3 = pd.read_csv('csvresults/ns3_throughput_size.csv', delimiter=',')
+    throughput = pd.read_csv('csvresults/OTHERS/output_throughput_size.csv', delimiter=',')
+    ns3 = pd.read_csv('csvresults/NS3/ns3_throughput_size.csv', delimiter=',')
 
     #matlab = pd.read_csv('da/matlab_wifi.csv', delimiter=',')
 
     throughput = throughput.groupby(['Payload'])['Throughput'].mean()
     ns3 = ns3.groupby(['Payload'])['Throughput'].mean()
 
-    ax1 = throughput.plot(marker='o', legend=True, ylim=(0, 40))
-    ax2 = ns3.plot(marker='x', legend=True, ylim=(0, 40))
+    ax1 = throughput.plot(marker='o', legend=True, ylim=(0, 40),yerr = throughput.std(),capsize=4)
+    ax2 = ns3.plot(marker='x', legend=True, ylim=(0, 40),yerr = ns3.std(),capsize=4)
 
     ax1.legend(['Coex_wifi_v2',"ns-3"])
     ax1.set_xlabel('Payload size [B]', fontsize=14)
@@ -550,7 +550,7 @@ def valid_fair_index():
 def valid_airtime_data():
     viridis(0.0, 1.0, 2)
 
-    edca = pd.read_csv('csvresults/edca_simulation_v1.csv', delimiter=',')
+    edca = pd.read_csv('csvresults/TESTS/test1.csv', delimiter=',')
 
     airtime_be = edca.groupby(['WiFi'])['beAirTime'].mean()
     airtime_bg = edca.groupby(['WiFi'])['bgAirTime'].mean()
@@ -567,7 +567,7 @@ def valid_airtime_data():
     ax4.set_ylabel('Airtime data [s]', fontsize=14)
 
     plt.tight_layout()
-    plt.savefig('results/edca_simulations_0.png')
+    plt.savefig('results/edca_simulations_test.png')
 
 def valid_poisson_airtime():
     viridis(0.0, 1.0, 2)
@@ -618,8 +618,8 @@ if __name__ == "__main__":
     #valid_throughput_and_size()
     #valid_throughput()
     #valid_fair_index()
-    #valid_airtime_data()
-    valid_poisson_airtime_peak()
+    valid_airtime_data()
+    #valid_poisson_airtime_peak()
     #valid_poisson_airtime()
     #print_collision_prob()
     #print_airtime_34()

@@ -15,3 +15,4 @@ csvresults/ns3_throughput_results.csv
 csvresults/ns3_throughput_size.csv
 *.csv
 __pycache__/.
+.idea/.
