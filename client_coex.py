@@ -10,6 +10,7 @@ def single_run(
         r_limit: int,
         payload_size: int,
         mcs_value: int,
+        poisson_lambda: int,
 ):
     backoffs = {key: {sum(stations_number.values()): 0} for key in range(cw_max + 1)}
     airtime_data = {"Station {}".format(i): 0 for i in range(1, sum(stations_number.values()) + 1)}
@@ -23,7 +24,7 @@ def single_run(
     run_simulation(stations_number, gnb_number, seeds, simulation_time,
                    Config(payload_size, cw_min, cw_max, r_limit, mcs_value),
                    Config_NR(16, 9, 1000, 1000, 0, 3, cw_min, cw_max, 6),
-                   backoffs, airtime_data, airtime_control, airtime_data_NR, airtime_control_NR)
+                   backoffs, airtime_data, airtime_control, airtime_data_NR, airtime_control_NR,poisson_lambda)
 
 
 
@@ -45,14 +46,14 @@ if __name__ == "__main__":
     print(list)
 
     for var in list:
-        for k in [1,2,3,4,5,6,7]:
+        for k in [0.01,0.02,0.03,0.035,0.04,0.05,0.07,0.09,0.1,0.2,0.4,0.6,0.8,1]:
             stationsConfig = {
-                "backgroundStations": k,
-                "bestEffortStations": k,
-                "videoStations": k,
-                "voiceStations": k
+                "backgroundStations": 0,
+                "bestEffortStations": 30,
+                "videoStations": 0,
+                "voiceStations": 0
             }
         #for var in list:
         # k = 4
-            single_run(seeds=var, stations_number=stationsConfig, gnb_number=0, simulation_time=10, payload_size=1500, cw_min=15,
-                       cw_max=1023, r_limit=7, mcs_value=7)
+            single_run(seeds=var, stations_number=stationsConfig, gnb_number=0, simulation_time=1, payload_size=1500, cw_min=13,
+                       cw_max=13, r_limit=7, mcs_value=7,poisson_lambda=k)

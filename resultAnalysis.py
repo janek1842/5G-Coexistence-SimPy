@@ -500,12 +500,12 @@ def valid_throughput():
     throughput = throughput.groupby(['WiFi'])['Throughput'].mean()
     ns3 = ns3.groupby(['WiFi'])['Throughput'].mean()
 
-    ax1 = throughput.plot(title=' Aggregated Throughput', marker='o', legend=True, ylim=(0, 40))
-    ax2 = ns3.plot(title=' Aggregated Throughput', marker='x', legend=True, ylim=(0, 40))
+    ax1 = throughput.plot(marker='o', legend=True, ylim=(0, 40))
+    ax2 = ns3.plot(marker='x', legend=True, ylim=(0, 40))
 
-    ax1.legend(['Coex_wifi',"ns-3"])
-    ax1.set_xlabel('Number of Wifi nodes', fontsize=14)
-    ax1.set_ylabel('Aggregated Throughput [Mb/s]', fontsize=14)
+    ax1.legend(['Coex_wifi_v2',"ns-3"])
+    ax1.set_xlabel('Number of Wi-Fi nodes', fontsize=14)
+    ax1.set_ylabel('Aggregated throughput [Mb/s]', fontsize=14)
 
     plt.tight_layout()
     plt.savefig('results/_results_throughput.png')
@@ -521,15 +521,15 @@ def valid_throughput_and_size():
     throughput = throughput.groupby(['Payload'])['Throughput'].mean()
     ns3 = ns3.groupby(['Payload'])['Throughput'].mean()
 
-    ax1 = throughput.plot(title=' Aggregated Throughput', marker='o', legend=True, ylim=(0, 40))
-    ax2 = ns3.plot(title=' Aggregated Throughput', marker='x', legend=True, ylim=(0, 40))
+    ax1 = throughput.plot(marker='o', legend=True, ylim=(0, 40))
+    ax2 = ns3.plot(marker='x', legend=True, ylim=(0, 40))
 
-    ax1.legend(['Coex_wifi',"ns-3"])
+    ax1.legend(['Coex_wifi_v2',"ns-3"])
     ax1.set_xlabel('Payload size [B]', fontsize=14)
-    ax1.set_ylabel('Aggregated Throughput [Mb/s]', fontsize=14)
+    ax1.set_ylabel('Aggregated throughput [Mb/s]', fontsize=14)
 
     plt.tight_layout()
-    plt.savefig('results/_results_throughput_size.png')
+    plt.savefig('results/results_throughput_size.png')
 
 def valid_fair_index():
     viridis(0.0, 1.0, 2)
@@ -538,7 +538,7 @@ def valid_fair_index():
 
     throughput = throughput.groupby(['SimulationTime'])['JainFairIndex'].mean()
 
-    ax1 = throughput.plot(marker='o', legend=True, ylim=(0.92, 1.01))
+    ax1 = throughput.plot(marker='o', legend=True, ylim=(0.92, 1))
 
     ax1.legend(['Coex_wifi_v2'])
     ax1.set_xlabel('Simulation time [s]', fontsize=14)
@@ -550,7 +550,7 @@ def valid_fair_index():
 def valid_airtime_data():
     viridis(0.0, 1.0, 2)
 
-    edca = pd.read_csv('csvresults/edca_simulation.csv', delimiter=',')
+    edca = pd.read_csv('csvresults/edca_simulation_v1.csv', delimiter=',')
 
     airtime_be = edca.groupby(['WiFi'])['beAirTime'].mean()
     airtime_bg = edca.groupby(['WiFi'])['bgAirTime'].mean()
@@ -567,12 +567,60 @@ def valid_airtime_data():
     ax4.set_ylabel('Airtime data [s]', fontsize=14)
 
     plt.tight_layout()
-    plt.savefig('results/edca_simulations.png')
+    plt.savefig('results/edca_simulations_0.png')
+
+def valid_poisson_airtime():
+    viridis(0.0, 1.0, 2)
+
+    edca = pd.read_csv('csvresults/edca_simulation_v2.csv', delimiter=',')
+
+    airtime_be = edca.groupby(['lambda'])['beAirTime'].mean()
+    # airtime_bg = edca.groupby(['lambda'])['bgAirTime'].mean()
+    # airtime_vd = edca.groupby(['lambda'])['vdAirTime'].mean()
+    # airtime_vo = edca.groupby(['lambda'])['vcAirTime'].mean()
+
+    ax4 = airtime_be.plot(marker='o', legend=True)
+    # ax2 = airtime_bg.plot(ax=ax1, marker='o', legend=True)
+    # ax3 = airtime_vd.plot(ax=ax2, marker='o', legend=True)
+    # ax4 = airtime_vo.plot(ax=ax3, marker='o', legend=True)
+
+    ax4.legend(['BestEffort'])
+    ax4.set_xlabel('Per-station traffic intensity [packets/ms]', fontsize=14)
+    ax4.set_ylabel('Airtime data [s]', fontsize=14)
+
+    plt.tight_layout()
+    plt.savefig('results/edca_simulations_v2.png')
+
+def valid_poisson_airtime_peak():
+    viridis(0.0, 1.0, 2)
+
+    edca = pd.read_csv('csvresults/peak_simulation.csv', delimiter=',')
+
+    airtime_be = edca.groupby(['lambda'])['beAirTime'].mean()
+    # airtime_bg = edca.groupby(['lambda'])['bgAirTime'].mean()
+    # airtime_vd = edca.groupby(['lambda'])['vdAirTime'].mean()
+    # airtime_vo = edca.groupby(['lambda'])['vcAirTime'].mean()
+
+    ax4 = airtime_be.plot(marker='o', legend=True)
+    # ax2 = airtime_bg.plot(ax=ax1, marker='o', legend=True)
+    # ax3 = airtime_vd.plot(ax=ax2, marker='o', legend=True)
+    # ax4 = airtime_vo.plot(ax=ax3, marker='o', legend=True)
+
+    ax4.legend(['BestEffort'])
+    ax4.set_xlabel('Per-station traffic intensity [packets/ms]', fontsize=14)
+    ax4.set_ylabel('Airtime data [s]', fontsize=14)
+
+    plt.tight_layout()
+    plt.savefig('results/edca_simulations_v3.png')
+
 
 if __name__ == "__main__":
     #valid_throughput_and_size()
+    #valid_throughput()
     #valid_fair_index()
-    valid_airtime_data()
+    #valid_airtime_data()
+    valid_poisson_airtime_peak()
+    #valid_poisson_airtime()
     #print_collision_prob()
     #print_airtime_34()
     #print_coexistance_airtime()
