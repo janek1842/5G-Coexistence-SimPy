@@ -5,7 +5,6 @@
   </component>
   <component name="ChangeListManager">
     <list default="true" id="35cf391d-db4b-490a-ba6b-3b7f89505c03" name="Changes" comment="">
-      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/client_coex.py" beforeDir="false" afterPath="$PROJECT_DIR$/client_coex.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/coexistanceSimpy/Coexistence.py" beforeDir="false" afterPath="$PROJECT_DIR$/coexistanceSimpy/Coexistence.py" afterDir="false" />
@@ -61,7 +60,7 @@
       <recent name="C:\Users\janfi\OneDrive\Dokumenty\GitHub\5G-Coexistence-SimPy" />
     </key>
   </component>
-  <component name="RunManager" selected="Python.client_coex">
+  <component name="RunManager" selected="Python.resultAnalysis">
     <configuration name="5G-Coexistence-SimPy" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
       <option name="INTERPRETER_OPTIONS" value="" />
       <option name="PARENT_ENVS" value="true" />
@@ -181,8 +180,8 @@
     </list>
     <recent_temporary>
       <list>
-        <item itemvalue="Python.client_coex" />
         <item itemvalue="Python.resultAnalysis" />
+        <item itemvalue="Python.client_coex" />
         <item itemvalue="Python.test" />
         <item itemvalue="Python.5G-Coexistence-SimPy" />
         <item itemvalue="Python.validation" />
@@ -219,6 +218,18 @@
       <workItem from="1655744632401" duration="4565000" />
       <workItem from="1656872581456" duration="5981000" />
       <workItem from="1657047540905" duration="706000" />
+      <workItem from="1657125109716" duration="9430000" />
+      <workItem from="1657228264433" duration="4096000" />
+      <workItem from="1657244194263" duration="53000" />
+      <workItem from="1657248779372" duration="175000" />
+      <workItem from="1657249133391" duration="191000" />
+      <workItem from="1657665507942" duration="8586000" />
+      <workItem from="1657674255466" duration="56000" />
+      <workItem from="1657731139675" duration="17689000" />
+      <workItem from="1658097047750" duration="5967000" />
+      <workItem from="1658176083806" duration="6971000" />
+      <workItem from="1658616133190" duration="7276000" />
+      <workItem from="1658654877361" duration="10552000" />
     </task>
     <servers />
   </component>
@@ -239,9 +250,9 @@
   </component>
   <component name="com.intellij.coverage.CoverageDataManagerImpl">
     <SUITE FILE_PATH="coverage/5G_Coexistence_SimPy$Coexistence.coverage" NAME="Coexistence Coverage Results" MODIFIED="1653518248613" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/coexistanceSimpy" />
-    <SUITE FILE_PATH="coverage/5G_Coexistence_SimPy$client_coex.coverage" NAME="client_coex Coverage Results" MODIFIED="1657061316388" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/5G_Coexistence_SimPy$client_coex.coverage" NAME="client_coex Coverage Results" MODIFIED="1658672422310" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/5G_Coexistence_SimPy$validation.coverage" NAME="validation Coverage Results" MODIFIED="1653867178335" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
     <SUITE FILE_PATH="coverage/5G_Coexistence_SimPy$test.coverage" NAME="test Coverage Results" MODIFIED="1655592021381" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/5G_Coexistence_SimPy$resultAnalysis.coverage" NAME="resultAnalysis Coverage Results" MODIFIED="1657057987819" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/5G_Coexistence_SimPy$resultAnalysis.coverage" NAME="resultAnalysis Coverage Results" MODIFIED="1658675350134" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
   </component>
 </project>

@@ -14,7 +14,7 @@ from typing import Dict, List
 from .Times import *
 from datetime import datetime
 
-output_csv = "csvresults/TESTS/test1.csv"
+output_csv = "csvresults/LAMBDA/lambda_simulation_v1.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
 
 typ_filename = "RS_coex_1sta_1wifi2.log"
@@ -152,7 +152,8 @@ class Station:
 
     def start_generating(self):
         self.sumTime = numpy.random.exponential(1/self.poisson_lambda)*1000
-        if (len(self.Queue) < 3):
+
+        if (len(self.Queue) < 30):
             self.Queue.append(1)
             self.frame_to_send = self.generate_new_frame()
         self.myself = self.env.process(self.wait_for_frame())
@@ -192,8 +193,8 @@ class Station:
                     # if(was_sent): # jesli udalo sie wyslac, usun z bufora jedną ramkę
                 # print(self.name, "aktLEN:", len(self.Queue))
             else:
-                print("ALARM")
-                yield self.env.timeout(big_num*100000)
+                #print("ALARM")
+                self.env.step()
         # print("zerowka")
                 # self.process = None
         # print(self.name," koncowo ",len(self.Queue))
@@ -382,6 +383,16 @@ class Station:
         self.frame_to_send.t_end = self.env.now
         self.frame_to_send.t_to_send = (self.frame_to_send.t_end - self.frame_to_send.t_start)
         self.channel.succeeded_transmissions += 1
+
+        if (self.config.cw_min == 15 and self.config.cw_max == 1023 and self.config.aifsn==7):
+            self.channel.succeeded_transmissions_bg += 1
+        elif (self.config.cw_min == 15 and self.config.cw_max == 1023 and self.config.aifsn == 3):
+            self.channel.succeeded_transmissions_be += 1
+        elif (self.config.cw_min == 7 and self.config.cw_max == 15 and self.config.aifsn == 2):
+            self.channel.succeeded_transmissions_vd += 1
+        else:
+            self.channel.succeeded_transmissions_vc += 1
+
         self.succeeded_transmissions += 1
         self.failed_transmissions_in_row = 0
         self.channel.bytes_sent += self.frame_to_send.data_size
@@ -806,6 +817,12 @@ class Channel:
 
     failed_transmissions: int = 0  # total failed transmissions
     succeeded_transmissions: int = 0  # total succeeded transmissions
+
+    succeeded_transmissions_be: int = 0
+    succeeded_transmissions_bg: int = 0
+    succeeded_transmissions_vc: int = 0
+    succeeded_transmissions_vd: int = 0
+
     bytes_sent: int = 0  # total bytes sent
     failed_transmissions_NR: int = 0  # total failed transmissions
     succeeded_transmissions_NR: int = 0  # total succeeded transmissions
@@ -881,7 +898,6 @@ def run_simulation(
         airtime_control,
         airtime_data_NR,
         airtime_control_NR
-
     )
     config_nr = Config_NR()
     config_wifi = Config()
@@ -986,6 +1002,14 @@ def run_simulation(
     # print(f'All occupancy: {normalized_channel_occupancy_time_all}')
     # print(f'All efficieny: {normalized_channel_efficiency_all}')
     throughput=(channel.succeeded_transmissions * config.data_size * 8) / (simulation_time * 1000000)
+
+    thrpt_vc = (channel.succeeded_transmissions_vc * config.data_size * 8) / (simulation_time * 1000000)
+    thrpt_vd = (channel.succeeded_transmissions_vd * config.data_size * 8) / (simulation_time * 1000000)
+    thrpt_be = (channel.succeeded_transmissions_be * config.data_size * 8) / (simulation_time * 1000000)
+    thrpt_bg = (channel.succeeded_transmissions_bg * config.data_size * 8) / (simulation_time * 1000000)
+
+    print(" T_VC: ", thrpt_vc, " T_VD: ",thrpt_vd, " T_BE: ",thrpt_be, " T_BG: ",thrpt_bg)
+
     jain_fair_index= pow(sum(airtime_data.values()),2) / ( 10 * sum({k: pow(v,2) for k,v in airtime_data.items()}.values()))
 
     beAirTime = getTimeCategories(number_of_stations,airtime_data,"bestEffort")
@@ -993,8 +1017,7 @@ def run_simulation(
     vcAirTime = getTimeCategories(number_of_stations,airtime_data,"voice")
     bgAirTime = getTimeCategories(number_of_stations,airtime_data,"background")
 
-
-    print(beAirTime,bgAirTime,vdAirTime,vcAirTime)
+    print(" BE: ",beAirTime," BG: ",bgAirTime," VD: ",vdAirTime," VC: ",vcAirTime)
 
     print(
         f"SEED = {seed} N_stations:={sum(number_of_stations.values())} N_gNB:={number_of_gnb}  CW_MIN = {config.cw_min} CW_MAX = {config.cw_max} "
@@ -1024,7 +1047,7 @@ def run_simulation(
         write_header = False
     with open(output_csv, mode='a', newline="") as result_file:
         result_adder = csv.writer(result_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        firstliner='Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcolWifi,ChannelOccupancyNR,ChannelEfficiencyNR,PcolNR,ChannelOccupancyAll,ChannelEfficiencyAll,Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda'
+        firstliner='Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcolWifi,ChannelOccupancyNR,ChannelEfficiencyNR,PcolNR,ChannelOccupancyAll,ChannelEfficiencyAll,Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg'
         # VideoAirTime, VoiceAirTime, BestEffortAirTime
 
         if write_header:
@@ -1034,5 +1057,6 @@ def run_simulation(
             [seed, sum(number_of_stations.values()), number_of_gnb, normalized_channel_occupancy_time, normalized_channel_efficiency,
              p_coll,
              normalized_channel_occupancy_time_NR, normalized_channel_efficiency_NR, p_coll_NR,
-             normalized_channel_occupancy_time_all, normalized_channel_efficiency_all,throughput,config.data_size,simulation_time,jain_fair_index,beAirTime,vdAirTime,vcAirTime,bgAirTime,poisson_lambda])
+             normalized_channel_occupancy_time_all, normalized_channel_efficiency_all,throughput,config.data_size,simulation_time,jain_fair_index,beAirTime,vdAirTime,vcAirTime,bgAirTime,poisson_lambda,
+             thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg])
 

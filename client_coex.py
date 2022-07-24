@@ -37,21 +37,21 @@ if __name__ == "__main__":
 
     #performing multiple runs
     list = []
-    for radn in range(1, 3):
+    for radn in range(1, 5):
         n = random.randint(10, 1000)
         list.append(n)
 
     print("SEEDS: ",list)
 
     for var in list:
-        for k in [1,2,5]:
+        for k in [0.05,0.1,0.15,0.2,0.25,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1,1.5,2]:
             stationsConfig = {
-                "backgroundStations": k,
-                "bestEffortStations": k,
-                "videoStations": k,
-                "voiceStations": k
+                "backgroundStations": 0,
+                "bestEffortStations": 4,
+                "videoStations": 0,
+                "voiceStations": 0
             }
         #for var in list:
         # k = 4
             single_run(seeds=var, stations_number=stationsConfig, gnb_number=0, simulation_time=10, payload_size=1500, cw_min=None,
-                       cw_max=1023, r_limit=7, mcs_value=7,poisson_lambda=None)
+                       cw_max=1023, r_limit=7, mcs_value=7,poisson_lambda=k)
