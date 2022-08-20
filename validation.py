@@ -11,12 +11,10 @@ import scipy.stats as st
 # n = 4
 # color = mpl.cm.viridis(np.linspace(0.0, 1.0, n))
 
-
+# Old validations
 def viridis(a, b, color_amount):
     color = mpl.cm.viridis(np.linspace(a, b, color_amount))
     mpl.rcParams['axes.prop_cycle'] = cycler.cycler('color', color)
-
-
 
 def valid_wifi_pcol():
     viridis(0.0, 1.0, 3)
@@ -41,7 +39,6 @@ def valid_wifi_pcol():
 
     plt.tight_layout()
     plt.savefig('val/wifi_pcol_63v2.svg')
-
 
 def valid_wifi():
     viridis(0.0, 1.0, 8)
@@ -73,7 +70,6 @@ def valid_wifi():
 
     plt.tight_layout()
     plt.savefig('val/wifi_airtime_1023v2.svg')
-
 
 def valid_nru_pcol():
     viridis(0.0, 1.0, 3)
@@ -185,7 +181,6 @@ def valid_nru_gap():
     plt.tight_layout()
     plt.savefig('val/gap_airtime_1023v2.svg')
 
-
 def calc():
     alpha = 0.05
 
@@ -201,7 +196,6 @@ def calc():
     print(std)
     print(var)
     print(yerr)
-
 
 def coex():
     viridis(0.0, 1.0, 4)
@@ -257,7 +251,6 @@ def coex2():
     plt.tight_layout()
     plt.savefig('val/coex_airtime_eff_1023v2.svg')
 
-
 def coex_rs():
     viridis(0.0, 1.0, 4)
 
@@ -285,7 +278,6 @@ def coex_rs():
     plt.tight_layout()
     plt.savefig('val/coex_airtime_rs_63.svg')
 
-
 def coex_pcol():
     viridis(0.0, 1.0, 4)
 
@@ -311,8 +303,6 @@ def coex_pcol():
 
     plt.tight_layout()
     plt.savefig('val/coex_pcol_1023.svg')
-
-
 
 def coexistence_rs():
         viridis(0.0, 1.0, 8)
@@ -352,7 +342,6 @@ def coexistence_rs():
 
         plt.tight_layout()
         plt.savefig('val/coex/coexistence_rs_63_6ms.svg')
-
 
 def coexistence_rs_pcol():
     viridis(0.0, 1.0, 4)
@@ -444,6 +433,8 @@ def coexistence_gap_pcol():
 
     plt.tight_layout()
     plt.savefig('val/coex/coexistence_gap_1023_pcol.svg')
+
+# My validations - Coex scenarios
 
 if __name__ == "__main__":
     #valid_wifi()

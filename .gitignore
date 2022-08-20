@@ -14,5 +14,6 @@ csvresults/ns3_throughput_results.csv
 *.xml
 csvresults/ns3_throughput_size.csv
 *.csv
-__pycache__/.
-.idea/.
+__pycache__
+.idea
+/coexistanceSimpy/_pycache_

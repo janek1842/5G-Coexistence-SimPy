@@ -11,13 +11,12 @@ MCS = {
     7: [54, 24],
 }
 
-
 class Times:
 
     t_slot = 9  # [us]
     t_sifs = 16  # [us]
 
-    ack_timeout = 24  # [us]
+    ack_timeout = 44  # [us]
 
     # Mac overhead
     mac_overhead = 40 * 8  # [b]
@@ -30,24 +29,26 @@ class Times:
     # overhead
     _overhead = 22  # [b]
 
-
     def __init__(self, payload: int = 1472, mcs: int = 7, aifsn: int = 3):
         self.payload = payload
         self.mcs = mcs
         # OFDM parameters
-        self.phy_data_rate = MCS[mcs][0] * pow(
-            10, -6
-        )  # [Mb/us] Possible values 6, 9, 12, 18, 24, 36, 48, 54
+        self.phy_data_rate = MCS[mcs][0] * pow(10, -6)  # [Mb/us] Possible values 6, 9, 12, 18, 24, 36, 48, 54
         self.phy_ctr_rate = MCS[mcs][1] * pow(10, -6)  # [Mb/u]
+
         self.n_data = 4 * self.phy_data_rate  # [b/symbol]
         self.n_ctr = 4 * self.phy_ctr_rate  # [b/symbol]
+
         self.data_rate = MCS[mcs][0]  # [b/us]
         self.ctr_rate = MCS[mcs][1]  # [b/us]
+
         self.ofdm_preamble = 16  # [us]
         self.ofdm_signal = 24 / self.ctr_rate  # [us]
+
         self.aifsn = aifsn
         t_slot = 9  # [us]
         t_sifs = 16  # [us]
+
         self.t_difs = aifsn * t_slot + t_sifs  # [us]
 
     # Data frame time
@@ -64,6 +65,7 @@ class Times:
         # PPDU Frame
         ppdu = self.ofdm_preamble + self.ofdm_signal + cpsdu / self.data_rate  # [us]
         ppdu_tx_time = math.ceil(ppdu)
+
         return ppdu_tx_time  # [us]
 
     # ACK frame time with SIFS
@@ -71,14 +73,5 @@ class Times:
         ack = Times._overhead + Times.ack_size  # [b]
         ack = self.ofdm_preamble + self.ofdm_signal + ack / self.ctr_rate  # [us]
         ack_tx_time = Times.t_sifs + ack
-        # return math.ceil(ack_tx_time)  # [us]
-        return 24
 
-    # # ACK Timeout
-    # def get_ack_timeout():
-    #     return ack_timeout
-
-    def get_thr(self):
-        return (self.payload * 8) / (
-            self.get_ppdu_frame_time() + self.get_ack_frame_time() + Times.t_difs
-        )
+        return math.ceil(ack_tx_time)
