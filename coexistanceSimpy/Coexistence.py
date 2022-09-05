@@ -10,11 +10,12 @@ import threading
 from numpy.random import RandomState
 from dataclasses import dataclass, field
 from typing import Dict, List
-
+from scipy.stats import erlang,pareto,exponnorm,lognorm,triang
+#from numpy.random import pareto
 from .Times import *
 from datetime import datetime
 
-output_csv = "csvresults/VAL/Coex/slot/slot-v1.csv"
+output_csv = "csvresults/VAL/WiFi/stations/sp-stations-v1.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
 
 typ_filename = "RS_coex_1sta_1wifi2.log"
@@ -63,7 +64,7 @@ class Config_NR:
     # channel access class related:
     M: int = 3  # amount of observation slots to wait after deter perion in prioritization period
     cw_max: int = 1023
-    #mcot: int = 6  # max ocupancy time
+    mcot: int = 6  # max ocupancy time
     retry_limit: int = 7
 
 def random_sample(max, number, min_distance=0):  # func used to desync gNBs
@@ -88,8 +89,8 @@ class Station:
             config: Config = Config(),
             simulation_time: int = 10,
             poisson_lambda: int = 10,
-            backoffs: dict = {}
-
+            backoffs: dict = {},
+            Queue: dict = {}
     ):
         self.backoffs = backoffs
         self.transtime = transtime
@@ -113,41 +114,45 @@ class Station:
         self.first_interrupt = False
         self.back_off_time = 0
         self.start = 0
+        self.sumTime = 0
         self.poisson_lambda = poisson_lambda
-        self.Queue = []
+        self.sumTime =0
+        self.simulation_time = simulation_time
+        self.Queue = Queue
 
-    def wait_for_frame(self):
-        yield self.env.timeout(self.sumTime)
+    def wait_for_frame(self,time_to_wait):
+        yield self.env.timeout(time_to_wait)
         self.start_generating()
 
     def start_generating(self):
-        self.sumTime = numpy.random.exponential(1/self.poisson_lambda)*1000
-
-        if (len(self.Queue) < 1):
-            self.Queue.append(1)
-            self.frame_to_send = self.generate_new_frame()
-        self.myself = self.env.process(self.wait_for_frame())
+        self.sumTime = numpy.random.exponential(1 / self.poisson_lambda) * 1000
+        self.Queue[self.name].append(1)
+        self.frame_to_send = self.generate_new_frame()
+        self.env.process(self.wait_for_frame(self.sumTime))
 
     def start(self):
-        if(self.poisson_lambda is not None):
+        if self.poisson_lambda is not None:
             self.start_generating()
 
         while True:
-            if len(self.Queue)>0 or self.poisson_lambda is None:
-                if(self.poisson_lambda is not None):
-                    self.Queue.pop(0)
-                else:
-                    self.frame_to_send = self.generate_new_frame()
-                was_sent = False
-                while not was_sent:
+            if len(self.Queue[self.name]) > 0 or self.poisson_lambda is None:
+                if self.poisson_lambda is not None:
+                    self.Queue[self.name].pop(0)
+                    pass
+                self.frame_to_send = self.generate_new_frame()
+                self.was_sent = False
+                while not self.was_sent:
                     if self.frame_to_send is not None:
                         self.process = self.env.process(self.wait_back_off())
                         yield self.process
-                        was_sent = yield self.env.process(self.send_frame())
+                        self.was_sent = yield self.env.process(self.send_frame())
                     else:
-                        was_sent = True
+                        self.was_sent = True
+            elif bool([a for a in self.Queue.values() if a == []]):
+                yield self.env.timeout(1000)
             else:
-                self.env.step()
+                yield self.env.timeout(1000)
+                #self.env.step()
 
     def wait_back_off(self):
         self.back_off_time = self.generate_new_back_off_time(
@@ -188,7 +193,7 @@ class Station:
                             f"Backoff decresed by {((slot_waited * self.times.t_slot) + self.times.t_difs)} new Backoff {self.back_off_time}")
                     self.first_interrupt = False
 
-    def send_frame(self,drop_flag=False):
+    def send_frame(self):
         self.channel.tx_list.append(self)  # add station to currently transmitting list
         res = self.channel.tx_queue.request(
             priority=(big_num - self.frame_to_send.frame_time))  # create request basing on this station frame length
@@ -216,7 +221,8 @@ class Station:
                 self.channel.back_off_list.clear()  # channel idle, clear backoff waiting list
                 was_sent = self.check_collision()  # check if collision occurred
 
-                if was_sent and drop_flag is False:  # transmission successful
+                if was_sent:  # transmission successful
+
                     self.channel.airtime_control[self.name] += self.times.get_ack_frame_time() + self.times.t_difs
 
                     yield self.env.timeout(self.times.get_ack_frame_time())  # wait ack
@@ -231,23 +237,29 @@ class Station:
                 self.channel.tx_queue.release(res)  # leave the transmitting queue
                 self.channel.tx_queue = simpy.PreemptiveResource(self.env,
                                                                  capacity=1)  # create new empty transmitting queue
+
+                self.channel.airtime_control[self.name] += self.times.ack_timeout
                 yield self.env.timeout(self.times.ack_timeout)  # simulate ack timeout after failed transmission
                 return False
 
         except simpy.Interrupt:  # this station does not have the longest frame, waiting frame time
+            #self.channel.airtime_control[self.name] += self.frame_to_send.frame_time
             yield self.env.timeout(self.frame_to_send.frame_time)
 
         was_sent = self.check_collision()
 
         if was_sent:  # check if collision occurred
             log(self, f'Waiting for ACK time: {self.times.get_ack_frame_time()}')
+            self.channel.airtime_control[self.name] += self.times.get_ack_frame_time()
             yield self.env.timeout(self.times.get_ack_frame_time())  # wait ack
         else:
             log(self, "waiting ack timeout slave")
+            self.channel.airtime_control[self.name] += Times.ack_timeout
             yield self.env.timeout(Times.ack_timeout)  # simulate ack timeout after failed transmission
         return was_sent
 
     def check_collision(self):  # check if the collision occurred
+
         if (len(self.channel.tx_list) + len(self.channel.tx_list_NR)) > 1 or (len(self.channel.tx_list) + len(self.channel.tx_list_NR)) == 0:
             self.sent_failed()
             return False
@@ -256,18 +268,18 @@ class Station:
             return True
 
     def generate_new_back_off_time(self, failed_transmissions_in_row):
+
         upper_limit = (pow(2, failed_transmissions_in_row) * (
-                self.cw_min + 1) - 1)  # define the upper limit basing on  unsuccessful transmissions in the row
+                self.config.cw_min + 1) - 1)  # define the upper limit basing on  unsuccessful transmissions in the row
         upper_limit = (
             upper_limit if upper_limit <= self.cw_max else self.cw_max)  # set upper limit to CW Max if is bigger then this parameter
         back_off = random.randint(0, upper_limit)  # draw the back off value
-
         self.backoffs[back_off][1] += 1  # store drawn value for future analyzess
         return back_off * self.times.t_slot
 
     def generate_new_frame(self):
-        #frame_length = self.times.get_ppdu_frame_time()
-        frame_length = self.transtime
+        frame_length = self.times.get_ppdu_frame_time()
+        #frame_length = self.transtime
         return Frame(frame_length, self.name, self.col, self.config.data_size, self.env.now)
 
     def sent_failed(self):
@@ -279,7 +291,7 @@ class Station:
         log(self, self.channel.failed_transmissions)
 
         if self.frame_to_send.number_of_retransmissions > self.config.r_limit:
-            self.frame_to_send = self.generate_new_frame()
+            #self.frame_to_send = self.generate_new_frame()
             self.failed_transmissions_in_row = 0
 
     def packet_dropped(self):
@@ -290,7 +302,7 @@ class Station:
         log(self, self.channel.failed_transmissions)
 
         if self.frame_to_send.number_of_retransmissions > self.config.r_limit:
-            self.frame_to_send = self.generate_new_frame()
+            #self.frame_to_send = self.generate_new_frame()
             self.failed_transmissions_in_row = 0
 
     def sent_completed(self):
@@ -323,7 +335,9 @@ class Gnb:
             channel: dataclass,
             config_nr,
             transtime,
-            backoffs
+            backoffs,
+            poisson_lambda,
+            Queue
     ):
         self.config_nr = config_nr
         self.transtime = transtime
@@ -353,24 +367,54 @@ class Gnb:
         self.waiting_backoff = False
         self.start_nr = 0
         self.backoffs = backoffs
+        self.poisson_lambda = poisson_lambda
+        self.Queue = Queue
+
+
+    def wait_for_frame(self):
+        yield self.env.timeout(self.sumTime)
+        self.start_generating()
+
+    def start_generating(self):
+        self.sumTime = numpy.random.exponential(1 / self.poisson_lambda) * 1000
+        self.Queue[self.name].append(1)
+        self.transmission_to_send=self.gen_new_transmission()
+        self.env.process(self.wait_for_frame())
 
     def start(self):
+        if self.poisson_lambda is not None:
+            self.start_generating()
+
         while True:
-            was_sent = False
-            while not was_sent:
-                if gap:
-                    self.process = self.env.process(self.wait_back_off_gap())
-                    yield self.process
-                    was_sent = yield self.env.process(self.send_transmission())
+            if len(self.Queue[self.name]) > 0 or self.poisson_lambda is None:
+                if self.poisson_lambda is not None:
+                    #self.Queue[self.name].pop(0)
+                    pass
                 else:
-                    self.process = self.env.process(self.wait_back_off())
-                    yield self.process
-                    was_sent = yield self.env.process(self.send_transmission())
+                    pass
+                self.transmission_to_send = self.gen_new_transmission()
+                was_sent = False
+                while not was_sent:
+                    if gap:
+                        self.process = self.env.process(self.wait_back_off_gap())
+                        yield self.process
+                        was_sent = yield self.env.process(self.send_transmission())
+                    else:
+                        self.process = self.env.process(self.wait_back_off())
+                        yield self.process
+                        was_sent = yield self.env.process(self.send_transmission())
+            elif bool([a for a in self.Queue.values() if a == []]):
+                yield self.env.timeout(1000)
+                #self.env.step()
+            else:
+                yield self.env.timeout(1000)
+                #self.env.step()
 
     def wait_back_off_gap(self):
         self.back_off_time = self.generate_new_back_off_time(self.failed_transmissions_in_row)
         m = self.config_nr.M
         prioritization_period_time = self.config_nr.deter_period + m * self.config_nr.observation_slot_duration
+
         self.back_off_time += prioritization_period_time  # add Priritization Period time to bacoff procedure
 
         while self.back_off_time > -1:
@@ -417,9 +461,11 @@ class Gnb:
                     log(self, f"Backoff waited, sending frame...")
                     self.back_off_time = -1  # leave the loop
                     self.waiting_backoff = False
+                    self.first_interrupt = False
 
                     self.channel.back_off_list_NR.remove(
                         self)  # leave the waiting list as Backoff was waited successfully
+
 
             except simpy.Interrupt:  # handle the interruptions from transmitting stations
                 log(self, "Waiting was interrupted")
@@ -443,8 +489,9 @@ class Gnb:
 
     def wait_back_off(self):
         global start
-        self.back_off_time = self.generate_new_back_off_time(self.failed_transmissions_in_row)
+        self.back_off_time = self.generate_new_back_off_time(failed_transmissions_in_row=self.failed_transmissions_in_row)
         m = self.config_nr.M
+
         prioritization_period_time = self.config_nr.deter_period + m * self.config_nr.observation_slot_duration
         self.back_off_time += prioritization_period_time  # add Priritization Period time to bacoff procedure
 
@@ -530,7 +577,7 @@ class Gnb:
 
                 log(self, f'Transmission will be for: {self.transmission_to_send.transmission_time} time')
 
-                yield self.env.timeout(self.transmission_to_send.transmission_time)
+                yield self.env.timeout(self.transmission_to_send.transmission_time )
 
                 self.channel.back_off_list_NR.clear()  # channel idle, clear backoff waiting list
                 was_sent = self.check_collision()  # check if collision occurred
@@ -566,6 +613,7 @@ class Gnb:
                 return False
             else:
                 self.sent_completed()
+                self.Queue[self.name].pop(0)
                 return True
         else:
             if (len(self.channel.tx_list) + len(self.channel.tx_list_NR)) > 1 or (len(self.channel.tx_list) + len(self.channel.tx_list_NR)) == 0:
@@ -578,6 +626,7 @@ class Gnb:
     def gen_new_transmission(self):
         #transmission_time = self.config_nr.mcot * 1000  # transforming to usec
         transmission_time = self.transtime
+
         if gap:
             rs_time = 0
         else:
@@ -588,14 +637,12 @@ class Gnb:
     def generate_new_back_off_time(self, failed_transmissions_in_row):
         # BACKOFF TIME GENERATION
 
-        upper_limit = (pow(2, failed_transmissions_in_row) * (
-                self.cw_min + 1) - 1)  # define the upper limit basing on  unsuccessful transmissions in the row
+        upper_limit = (pow(2,failed_transmissions_in_row) * (
+                self.config_nr.cw_min + 1) - 1)  # define the upper limit basing on  unsuccessful transmissions in the row
         upper_limit = (
             upper_limit if upper_limit <= self.cw_max else self.cw_max)  # set upper limit to CW Max if is bigger then this parameter
         back_off = random.randint(0, upper_limit)  # draw the back off value
-
         self.backoffs[back_off][1] += 1  # store drawn value for future analyzes
-
         return back_off * self.config_nr.observation_slot_duration
 
     def sent_failed(self):
@@ -605,7 +652,8 @@ class Gnb:
         self.failed_transmissions += 1
         self.failed_transmissions_in_row += 1
         log(self, self.channel.failed_transmissions_NR)
-        if self.transmission_to_send.number_of_retransmissions > 7:
+        if self.transmission_to_send.number_of_retransmissions > self.config_nr.retry_limit:
+            self.transmission_to_send=self.gen_new_transmission()
             self.failed_transmissions_in_row = 0
 
     def sent_completed(self):
@@ -702,7 +750,9 @@ def run_simulation(
         airtime_data_NR: Dict[str, int],
         airtime_control_NR: Dict[str, int],
         poisson_lambda,
-        transtime
+        transtime,
+        Queue,
+        distribution_k
 ):
     random.seed(seed)
     environment = simpy.Environment()
@@ -719,26 +769,27 @@ def run_simulation(
     )
 
     transtime = transtime
+
     for i in range(1, sum(number_of_stations.values()) + 1):
         # 1st group - Background
         if i in range (1,number_of_stations["backgroundStations"]+1):
             config_local = Config(config.data_size, 15, 1023, config.r_limit, config.mcs,7)
-            Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(1023 + 1)})
+            Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(1023 + 1)},Queue=Queue)
         # 2nd group - Best Effort
         elif i in range (number_of_stations["backgroundStations"]+1,number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+1):
             config_local = Config(config.data_size, config.cw_min, config.cw_max, config.r_limit, config.mcs,3)
-            Station(environment, "Station {}".format(i), channel=channel, config=config_local,simulation_time=simulation_time,poisson_lambda=poisson_lambda,backoffs={key: {1: 0} for key in range(1023 + 1)},transtime=transtime)
+            Station(environment, "Station {}".format(i), channel=channel, config=config_local,simulation_time=simulation_time,poisson_lambda=poisson_lambda,backoffs={key: {1: 0} for key in range(1023 + 1)},transtime=transtime,Queue=Queue)
         # 3rd group - Video
         elif i in range (number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+1,number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+number_of_stations["videoStations"]+1):
-            config_local = Config(config.data_size, 7, 15, config.r_limit, config.mcs, 2)
-            Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(15 + 1)})
+            config_local = Config(config.data_size, 3, 15, config.r_limit, config.mcs, 2)
+            Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(15 + 1)},Queue=Queue)
         # 4th group - Voice
         else:
             config_local = Config(config.data_size, 3,7, config.r_limit, config.mcs, 2)
-            Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(7 + 1)})
+            Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(7 + 1)},Queue=Queue)
 
     for i in range(1, number_of_gnb + 1):
-        Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr,transtime=transtime,backoffs = {key: {1: 0} for key in range(1023 + 1)})
+        Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr,transtime=transtime,backoffs = {key: {1: 0} for key in range(1023 + 1)},poisson_lambda=poisson_lambda,Queue=Queue)
 
     environment.run(until=simulation_time * 1000000)
 
@@ -746,6 +797,8 @@ def run_simulation(
         if (channel.failed_transmissions + channel.succeeded_transmissions) != 0:
             p_coll = "{:.4f}".format(
                 channel.failed_transmissions / (channel.failed_transmissions + channel.succeeded_transmissions))
+        else:
+            p_coll = 0
     else:
         p_coll = 0
 
@@ -782,7 +835,7 @@ def run_simulation(
     normalized_channel_efficiency_all = (channel_efficiency + channel_efficiency_NR) / time
 
     throughput=(channel.succeeded_transmissions * config.data_size * 8) / (simulation_time * 1000000)
-
+    print(config.data_size)
     thrpt_vc = (channel.succeeded_transmissions_vc * config.data_size * 8) / (simulation_time * 1000000)
     thrpt_vd = (channel.succeeded_transmissions_vd * config.data_size * 8) / (simulation_time * 1000000)
     thrpt_be = (channel.succeeded_transmissions_be * config.data_size * 8) / (simulation_time * 1000000)
@@ -791,15 +844,17 @@ def run_simulation(
     print("------------------------------------------------------------------------------------------")
     print(" T_VC: ", thrpt_vc, " T_VD: ",thrpt_vd, " T_BE: ",thrpt_be, " T_BG: ",thrpt_bg)
 
-    if(sum(number_of_stations.values()) !=0):
-        jain_fair_index= pow(sum(airtime_data.values()),2) / ( 10 * sum({k: pow(v,2) for k,v in airtime_data.items()}.values()))
-    else:
+    jain_dict = airtime_data
+    jain_dict.update(airtime_data_NR)
+    try:
+        jain_fair_index= pow(sum(jain_dict.values()),2) / ( (number_of_gnb + sum(number_of_stations.values()) ) * sum({k: pow(v,2) for k,v in jain_dict.items() }.values()))
+    except:
         jain_fair_index = 0
 
-    beAirTime = getTimeCategories(number_of_stations,airtime_data,"bestEffort")
-    vdAirTime = getTimeCategories(number_of_stations,airtime_data,"video")
-    vcAirTime = getTimeCategories(number_of_stations,airtime_data,"voice")
-    bgAirTime = getTimeCategories(number_of_stations,airtime_data,"background")
+    beAirTime = getTimeCategories(number_of_stations,airtime_data,"bestEffort") / (simulation_time * 1000000)
+    vdAirTime = getTimeCategories(number_of_stations,airtime_data,"video") / (simulation_time * 1000000)
+    vcAirTime = getTimeCategories(number_of_stations,airtime_data,"voice") / (simulation_time * 1000000)
+    bgAirTime = getTimeCategories(number_of_stations,airtime_data,"background") / (simulation_time * 1000000)
 
     print(" BE: ",beAirTime," BG: ",bgAirTime," VD: ",vdAirTime," VC: ",vcAirTime)
 
@@ -815,6 +870,8 @@ def run_simulation(
     print("payload:",config.data_size)
     print("lambda:", poisson_lambda)
     print("sync",config_nr.synchronization_slot_duration)
+    print("JFE: ", jain_fair_index)
+    print("distribution_k: ", distribution_k)
     print("------------------------------------------------------------------------------------------")
 
     write_header = True
@@ -823,7 +880,7 @@ def run_simulation(
     with open(output_csv, mode='a', newline="") as result_file:
         result_adder = csv.writer(result_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         firstliner='Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcolWifi,ChannelOccupancyNR,ChannelEfficiencyNR,PcolNR,ChannelOccupancyAll,ChannelEfficiencyAll,' \
-                   'Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,cw_min,mcs,retryLimit,sync,lenLte'
+                   'Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,cw_min,mcs,retryLimit,sync,lenLte,distribution_k'
 
         if write_header:
             result_adder.writerow([firstliner.strip('"')])
@@ -833,11 +890,7 @@ def run_simulation(
              p_coll,
              normalized_channel_occupancy_time_NR, normalized_channel_efficiency_NR, p_coll_NR,
              normalized_channel_occupancy_time_all, normalized_channel_efficiency_all,throughput,config.data_size,simulation_time,jain_fair_index,beAirTime,vdAirTime,vcAirTime,bgAirTime,poisson_lambda,
-             thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,config.cw_min,config.mcs,config.r_limit,config_nr.synchronization_slot_duration,transtime])
-
-
-
-
+             thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,config.cw_min,config.mcs,config.r_limit,config_nr.synchronization_slot_duration,transtime,distribution_k])
 
 
 

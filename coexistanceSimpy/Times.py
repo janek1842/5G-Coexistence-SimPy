@@ -19,7 +19,7 @@ class Times:
     ack_timeout = 44  # [us]
 
     # Mac overhead
-    mac_overhead = 40 * 8  # [b]
+    mac_overhead = (40) * 8  # [b]
 
     # ACK size
     ack_size = 14 * 8  # [b]
@@ -54,6 +54,7 @@ class Times:
     # Data frame time
     def get_ppdu_frame_time(self):
         msdu = self.payload * 8  # [b]
+
         # MacFrame
         mac_frame = Times.mac_overhead + msdu  # [b]
         # PPDU Padding
@@ -64,6 +65,7 @@ class Times:
         cpsdu = Times._overhead + mac_frame + ppdu_padding  # [b]
         # PPDU Frame
         ppdu = self.ofdm_preamble + self.ofdm_signal + cpsdu / self.data_rate  # [us]
+
         ppdu_tx_time = math.ceil(ppdu)
 
         return ppdu_tx_time  # [us]
@@ -73,5 +75,4 @@ class Times:
         ack = Times._overhead + Times.ack_size  # [b]
         ack = self.ofdm_preamble + self.ofdm_signal + ack / self.ctr_rate  # [us]
         ack_tx_time = Times.t_sifs + ack
-
         return math.ceil(ack_tx_time)
