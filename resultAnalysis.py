@@ -23,19 +23,17 @@ def valid_single_simulation():
     viridis(0.0, 1.0, 2)
 
     # Simulation results parameters
-    domain = 'distribution_k'
-    anti_domain = 'thrpt_be'
+    domain = 'lambda'
+    anti_domain = 'beAirTime'
 
     sim1_label = "5G-Coex-SimPy"
-    sim1 = pd.read_csv('csvresults/VAL/STD/st-erlang-v1.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/VAL/LAMBDA/peak/peak_simulation_v1.csv', delimiter=',')
 
-    x_axis_description = "k"
-    y_axis_description = "Throughput"
+    x_axis_description = "Lambda"
+    y_axis_description = "Channel occupancy"
 
-    sim1_color = "blue"
-
-    y_range = (0, 50)
-    result_file_path = 'results/VAL/STD/erlang-v1.svg'
+    y_range = (0, 0.7)
+    result_file_path = 'results/VAL/lambda/peak/peak-v1.svg'
 
     # t-student parameter for confidence intervals
     alfa = 0.05
@@ -53,7 +51,7 @@ def valid_single_simulation():
     sim1 = sim1.groupby([domain])[anti_domain].mean()
 
     # Results plotting
-    sim1_plot = sim1.plot(marker='o', legend=True, ylim=y_range,yerr=sim1_err, capsize=4)
+    sim1_plot = sim1.plot(marker='o', legend=True,ylim=y_range,yerr=sim1_err,capsize=4)
 
     sim1_plot.legend([sim1_label])
     sim1_plot.set_xlabel(x_axis_description, fontsize=14)
@@ -66,21 +64,21 @@ def valid_two_simulations():
     viridis(0.0, 1.0, 2)
 
     # Simulation results parameters
-    domain = 'WiFi'
+    domain = 'Payload'
     anti_domain = 'Throughput'
 
-    sim1_label = "ns-3"
-    sim2_label = "5G-Coex-SimPy"
+    sim1_label = "5G-Coex-SimPy"
+    sim2_label = "ns-3"
 
-    sim1 = pd.read_csv('csvresults/VAL/WiFi/stations/ns3-stations-v1.csv', delimiter=',')
-    sim2 = pd.read_csv('csvresults/VAL/WiFi/stations/sp-stations-v1.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/VAL/RTS/payload/sp-rts-cts-v02.csv', delimiter=',')
+    sim2 = pd.read_csv('csvresults/VAL/RTS/payload/ns3-v2.csv', delimiter=',')
 
-    x_axis_description = "Total number of stations"
+    x_axis_description = "Payload [B]"
     y_axis_description = "Throughput [Mb/s]"
     linestyle="solid"
 
     y_range = (0,50)
-    result_file_path = 'results/VAL/WiFi/stations/thrpt/thrpt-stations-v1.svg'
+    result_file_path = 'results/VAL/RTS/payload/rts-payload-thrpt--v2.svg'
 
     # t-student parameter for confidence intervals
     alfa = 0.05
@@ -106,7 +104,7 @@ def valid_two_simulations():
     sim2_plot = sim2.plot(ax=sim1_plot, marker='x', legend=True, capsize=4, yerr = sim2_err,linestyle=linestyle)
 
     # log scale
-    # sim1_plot.set_xscale('log')
+    #sim1_plot.set_xscale('log')
 
     sim2_plot.legend([sim1_label,sim2_label])
     sim2_plot.set_xlabel(x_axis_description, fontsize=14)
@@ -118,7 +116,7 @@ def valid_two_simulations():
 def valid_four_simulations():
     viridis(0.0, 1.0, 2)
 
-    domain = 'lambda'
+    domain = 'retryLimit'
     anti_domain_1 = 'PcollNR'
     anti_domain_2 = 'PcollWiFi'
 
@@ -128,15 +126,15 @@ def valid_four_simulations():
     sim2_2_label = "5G-Coex-SimPy: WiFi"
 
     # Simulation results parameters
-    sim1 = pd.read_csv('csvresults/VAL/LAMBDA/lambda-coex/matlab-lambda-coex-1.csv', delimiter=',')
-    sim2 = pd.read_csv('csvresults/VAL/LAMBDA/lambda-coex/coex-v1.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/VAL/Coex/r/matlab-coex-r-v1.csv', delimiter=',')
+    sim2 = pd.read_csv('csvresults/VAL/Coex/r/coex-r-v1.csv', delimiter=',')
 
-    OX_description = "Lambda"
+    OX_description = "Retry limit"
     OY_description = "Collision probability"
-    result_file='results/VAL/Coex/lambda/cp-lambda-coex-v1.svg'
+    result_file='results/VAL/Coex/r/coex-r-cp-v1.svg'
 
     lim_range = (0,1)
-    linestyle = "solid"
+    linestyle = "dashed"
     # t-student parameter for confidence intervals
     alfa = 0.05
 
@@ -195,11 +193,11 @@ def print_four_simulations():
     sim1_4_label = "5G-Coex-SimPy: AC_BK"
 
     # Simulation results parameters
-    sim1 = pd.read_csv('csvresults/OTHER/EDCA/edca_simulation_v8.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/VAL/LAMBDA/lambda-edca/lambda-edca-st.csv', delimiter=',')
 
     OX_description = "Total number of stations"
-    OY_description = "Normalized airtime [s]"
-    result_file = 'results/VAL/EDCA/others/edca-stations-v4.svg'
+    OY_description = "Channel occupancy"
+    result_file = 'results/VAL/LAMBDA/lambda-edca/lambda-st-edca.svg'
 
     # t-student parameter for confidence intervals
     alfa = 0.05
@@ -223,16 +221,16 @@ def print_four_simulations():
     sim1_4_err = sim1_4_std / np.sqrt(sim1_4_n) * t.ppf(1 - alfa / 2, sim1_4_n - 1)
 
     # Results grouping
-    sim1_1 = sim1.groupby([domain])[anti_domain_1].mean()
-    sim1_2 = sim1.groupby([domain])[anti_domain_2].mean()
-    sim1_3 = sim1.groupby([domain])[anti_domain_3].mean()
-    sim1_4 = sim1.groupby([domain])[anti_domain_4].mean()
+    sim1_1 = sim1.groupby([domain])[anti_domain_1].mean() / 3e6
+    sim1_2 = sim1.groupby([domain])[anti_domain_2].mean() / 3e6
+    sim1_3 = sim1.groupby([domain])[anti_domain_3].mean() / 3e6
+    sim1_4 = sim1.groupby([domain])[anti_domain_4].mean() / 3e6
 
     # Results plotting
-    ax1 = sim1_1.plot(marker='o', legend=True, yerr=sim1_1_err, capsize=4, color='green', mfc='none')
-    ax2 = sim1_2.plot(ax=ax1, marker='o', legend=True, yerr=sim1_2_err, capsize=4, color='orange')
-    ax3 = sim1_3.plot(ax=ax2, marker='o', legend=True, yerr=sim1_3_err, capsize=4, color='red', mfc='none')
-    ax4 = sim1_4.plot(ax=ax3, marker='o', legend=True, yerr=sim1_4_err, capsize=4, mfc='blue')
+    ax1 = sim1_1.plot(marker='o', legend=True , ylim=(0,1), mfc='none')
+    ax2 = sim1_2.plot(ax=ax1, marker='o', legend=True )
+    ax3 = sim1_3.plot(ax=ax2, marker='o', legend=True , mfc='none')
+    ax4 = sim1_4.plot(ax=ax3, marker='o', legend=True)
 
     # log scale option
     #ax4.set_xscale('log')
@@ -243,7 +241,6 @@ def print_four_simulations():
 
     plt.tight_layout()
     plt.savefig(result_file)
-
 
 
 if __name__ == "__main__":

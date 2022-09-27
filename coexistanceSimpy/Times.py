@@ -24,7 +24,7 @@ class Times:
     # ACK size
     ack_size = 14 * 8  # [b]
 
-    t_difs=0
+    t_difs= 16 + 3*9
 
     # overhead
     _overhead = 22  # [b]
@@ -76,3 +76,6 @@ class Times:
         ack = self.ofdm_preamble + self.ofdm_signal + ack / self.ctr_rate  # [us]
         ack_tx_time = Times.t_sifs + ack
         return math.ceil(ack_tx_time)
+
+    def get_rts_cts_time(self):
+        return Times.t_difs + 2 * Times.t_sifs + (20 * 8 / self.ctr_rate) + (14 * 8 / self.ctr_rate)

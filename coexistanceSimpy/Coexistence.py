@@ -15,10 +15,13 @@ from scipy.stats import erlang,pareto,exponnorm,lognorm,triang
 from .Times import *
 from datetime import datetime
 
-output_csv = "csvresults/VAL/WiFi/stations/sp-stations-v1.csv"
+output_csv = "csvresults/VAL/RTS/payload/sp-rts-cts-v02.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
 
 typ_filename = "RS_coex_1sta_1wifi2.log"
+
+RTS_global_flag = True
+RTS_transmitter = ""
 
 logging.basicConfig(filename="",format='%(asctime)s %(message)s',filemode='w')
 
@@ -51,6 +54,7 @@ class Config:
     r_limit: int = 7
     mcs: int = 7
     aifsn: int = 3
+    RTS_threshold: int = 1000
 
 @dataclass()
 class Config_NR:
@@ -133,6 +137,8 @@ class Station:
     def start(self):
         if self.poisson_lambda is not None:
             self.start_generating()
+        global RTS_global_flag
+
 
         while True:
             if len(self.Queue[self.name]) > 0 or self.poisson_lambda is None:
@@ -143,11 +149,21 @@ class Station:
                 self.was_sent = False
                 while not self.was_sent:
                     if self.frame_to_send is not None:
-                        self.process = self.env.process(self.wait_back_off())
-                        yield self.process
-                        self.was_sent = yield self.env.process(self.send_frame())
+                            self.process = self.env.process(self.wait_back_off())
+                            yield self.process
+
+                            if RTS_global_flag and self.config.data_size >= self.config.RTS_threshold:
+                                RTS_global_flag = False
+                                yield self.env.timeout(self.times.get_rts_cts_time())
+                                self.was_sent = yield self.env.process(self.send_frame())
+                                RTS_global_flag = True
+
+                            elif self.config.RTS_threshold is None or self.config.data_size < self.config.RTS_threshold:
+                                self.was_sent = yield self.env.process(self.send_frame())
+
                     else:
                         self.was_sent = True
+
             elif bool([a for a in self.Queue.values() if a == []]):
                 yield self.env.timeout(1000)
             else:
@@ -155,6 +171,7 @@ class Station:
                 #self.env.step()
 
     def wait_back_off(self):
+
         self.back_off_time = self.generate_new_back_off_time(
             self.failed_transmissions_in_row)  # generating the new Back Off time
 
@@ -162,18 +179,53 @@ class Station:
             try:
                 with self.channel.tx_lock.request() as req:  # waiting  for idle channel -- empty channel
                     yield req
+
                 self.back_off_time += self.times.t_difs  # add DIFS time
+
+
+                # if RTS_global_flag:
+                #     print("me")
+                #     yield self.env.timeout(self.times.t_difs)
+                #     yield self.env.timeout(20 * 8 / 24)
+                #     yield self.env.timeout(self.times.t_sifs)
+                #     yield self.env.timeout(14 * 8 / 24)
+                #     yield self.env.timeout(self.times.t_sifs)
+
+                # if self.channel.rts_lock.count==0:
+                #     with self.channel.rts_lock.request() as rtsReq:
+                #         yield rtsReq
+                #         yield self.env.timeout(self.times.t_difs)
+                #         yield self.env.timeout(20 * 8 / 24)
+                #         yield self.env.timeout(self.times.t_sifs)
+                #         yield self.env.timeout(14 * 8 / 24)
+                #         yield self.env.timeout(self.times.t_sifs)
+                #         self.channel.airtime_control[self.name] = self.times.t_difs + 2 * self.times.t_sifs + (20*8/24) + (14*8/24)
+                #
+
+
+
+                # else:
+                #     yield self.env.timeout(self.times.t_difs+self.frame_to_send.frame_time + self.times.t_difs+2*self.times.t_sifs+(20*8/24)+(14*8/24))
+                #     self.wait_back_off()
+
+                    # except simpy.Interrupt:
+                    #     self.channel.airtime_control[self.name] = self.times.t_difs + 2 * self.times.t_sifs + (20 * 8 / 24) + (14 * 8 / 24)
+                    #     yield self.env.timeout(self.times.t_difs+self.frame_to_send.frame_time + self.times.t_difs+2*self.times.t_sifs+(20*8/24)+(14*8/24))
+
                 log(self, f"Starting to wait backoff (with DIFS): ({self.back_off_time})u...")
                 self.first_interrupt = True
                 self.start = self.env.now  # store the current simulation time
                 self.channel.back_off_list.append(self)  # join the list off stations which are waiting Back Offs
 
+
                 yield self.env.timeout(self.back_off_time)  # join the environment action queue
 
-                log(self, f"Backoff waited, sending frame...")
-                self.back_off_time = -1  # leave the loop
 
+                log(self, f"Backoff waited, sending frame...")
+
+                self.back_off_time = -1  # leave the loop
                 self.channel.back_off_list.remove(self)  # leave the waiting list as Backoff was waited successfully
+
 
             except simpy.Interrupt:  # handle the interruptions from transmitting stations
                 if self.first_interrupt and self.start is not None:
@@ -194,13 +246,13 @@ class Station:
                     self.first_interrupt = False
 
     def send_frame(self):
+
         self.channel.tx_list.append(self)  # add station to currently transmitting list
         res = self.channel.tx_queue.request(
             priority=(big_num - self.frame_to_send.frame_time))  # create request basing on this station frame length
 
         try:
-            result = yield res | self.env.timeout(
-                0)  # try to hold transmitting lock(station with the longest frame will get this)
+            result = yield res | self.env.timeout(0)  # try to hold transmitting lock(station with the longest frame will get this)
 
             if res not in result:  # check if this station got lock, if not just wait you frame time
                 raise simpy.Interrupt("There is a longer frame...")
@@ -218,17 +270,17 @@ class Station:
                 log(self, f'Starting sending frame: {self.frame_to_send.frame_time}')
 
                 yield self.env.timeout(self.frame_to_send.frame_time)  # wait this station frame time
+
                 self.channel.back_off_list.clear()  # channel idle, clear backoff waiting list
                 was_sent = self.check_collision()  # check if collision occurred
 
                 if was_sent:  # transmission successful
-
                     self.channel.airtime_control[self.name] += self.times.get_ack_frame_time() + self.times.t_difs
-
                     yield self.env.timeout(self.times.get_ack_frame_time())  # wait ack
                     self.channel.tx_list.clear()  # clear transmitting list
                     self.channel.tx_list_NR.clear()
                     self.channel.tx_queue.release(res)  # leave the transmitting queue
+
                     return True
 
                 # there was collision
@@ -237,14 +289,13 @@ class Station:
                 self.channel.tx_queue.release(res)  # leave the transmitting queue
                 self.channel.tx_queue = simpy.PreemptiveResource(self.env,
                                                                  capacity=1)  # create new empty transmitting queue
-
                 self.channel.airtime_control[self.name] += self.times.ack_timeout
                 yield self.env.timeout(self.times.ack_timeout)  # simulate ack timeout after failed transmission
                 return False
 
         except simpy.Interrupt:  # this station does not have the longest frame, waiting frame time
-            #self.channel.airtime_control[self.name] += self.frame_to_send.frame_time
-            yield self.env.timeout(self.frame_to_send.frame_time)
+             # self.channel.airtime_control[self.name] += self.frame_to_send.frame_time
+             yield self.env.timeout(self.frame_to_send.frame_time)
 
         was_sent = self.check_collision()
 
@@ -260,7 +311,7 @@ class Station:
 
     def check_collision(self):  # check if the collision occurred
 
-        if (len(self.channel.tx_list) + len(self.channel.tx_list_NR)) > 1 or (len(self.channel.tx_list) + len(self.channel.tx_list_NR)) == 0:
+        if (len(self.channel.tx_list) + len(self.channel.tx_list_NR)) > 1 or (len(self.channel.tx_list) + len(self.channel.tx_list_NR)) == 0 :
             self.sent_failed()
             return False
         else:
@@ -290,7 +341,7 @@ class Station:
         self.failed_transmissions_in_row += 1
         log(self, self.channel.failed_transmissions)
 
-        if self.frame_to_send.number_of_retransmissions > self.config.r_limit:
+        if self.frame_to_send.number_of_retransmissions > 7:
             #self.frame_to_send = self.generate_new_frame()
             self.failed_transmissions_in_row = 0
 
@@ -323,7 +374,6 @@ class Station:
         self.succeeded_transmissions += 1
         self.failed_transmissions_in_row = 0
         self.channel.bytes_sent += self.frame_to_send.data_size
-
         self.channel.airtime_data[self.name] += self.frame_to_send.frame_time
         return True
 
@@ -388,7 +438,7 @@ class Gnb:
         while True:
             if len(self.Queue[self.name]) > 0 or self.poisson_lambda is None:
                 if self.poisson_lambda is not None:
-                    #self.Queue[self.name].pop(0)
+                    self.Queue[self.name].pop(0)
                     pass
                 else:
                     pass
@@ -404,11 +454,7 @@ class Gnb:
                         yield self.process
                         was_sent = yield self.env.process(self.send_transmission())
             elif bool([a for a in self.Queue.values() if a == []]):
-                yield self.env.timeout(1000)
-                #self.env.step()
-            else:
-                yield self.env.timeout(1000)
-                #self.env.step()
+                self.env.step()
 
     def wait_back_off_gap(self):
         self.back_off_time = self.generate_new_back_off_time(self.failed_transmissions_in_row)
@@ -547,7 +593,7 @@ class Gnb:
 
     def send_transmission(self):
         self.channel.tx_list_NR.append(self)  # add station to currently transmitting list
-        self.transmission_to_send = self.gen_new_transmission()
+        #self.transmission_to_send = self.gen_new_transmission()
         res = self.channel.tx_queue.request(priority=(
                 big_num - self.transmission_to_send.transmission_time))  # create request basing on this station frame length
 
@@ -556,6 +602,7 @@ class Gnb:
                 0)  # try to hold transmitting lock(station with the longest frame will get this)
 
             if res not in result:  # check if this station got lock, if not just wait you frame time
+
                 raise simpy.Interrupt("There is a longer frame...")
                 # self.env.timeout(self.transmission_to_send.transmission_time)
                 # return False
@@ -597,11 +644,11 @@ class Gnb:
             self.channel.tx_list.clear()
             self.channel.tx_queue.release(res)  # leave the transmitting queue
             self.channel.tx_queue = simpy.PreemptiveResource(self.env,capacity=1)  # create new empty transmitting queue
-
             return False
 
         except simpy.Interrupt:  # this station does not have the longest frame, waiting frame time
             yield self.env.timeout(self.transmission_to_send.transmission_time)
+
 
         was_sent = self.check_collision()
         return was_sent
@@ -613,7 +660,6 @@ class Gnb:
                 return False
             else:
                 self.sent_completed()
-                self.Queue[self.name].pop(0)
                 return True
         else:
             if (len(self.channel.tx_list) + len(self.channel.tx_list_NR)) > 1 or (len(self.channel.tx_list) + len(self.channel.tx_list_NR)) == 0:
@@ -626,7 +672,6 @@ class Gnb:
     def gen_new_transmission(self):
         #transmission_time = self.config_nr.mcot * 1000  # transforming to usec
         transmission_time = self.transtime
-
         if gap:
             rs_time = 0
         else:
@@ -647,11 +692,13 @@ class Gnb:
 
     def sent_failed(self):
         log(self, "There was a collision")
+
         self.transmission_to_send.number_of_retransmissions += 1
         self.channel.failed_transmissions_NR += 1
         self.failed_transmissions += 1
         self.failed_transmissions_in_row += 1
         log(self, self.channel.failed_transmissions_NR)
+
         if self.transmission_to_send.number_of_retransmissions > self.config_nr.retry_limit:
             self.transmission_to_send=self.gen_new_transmission()
             self.failed_transmissions_in_row = 0
@@ -669,6 +716,8 @@ class Gnb:
 class Channel:
     tx_queue: simpy.PreemptiveResource  # lock for the stations with the longest frame to transmit
     tx_lock: simpy.Resource  # channel lock (locked when there is ongoing transmission)
+    rts_lock: simpy.Resource # RTS / CTS lock (the transmitting station is locking this object)
+
     n_of_stations: int  # number of transmitting stations in the channel
     n_of_eNB: int
     backoffs: Dict[int, Dict[int, int]]
@@ -752,12 +801,14 @@ def run_simulation(
         poisson_lambda,
         transtime,
         Queue,
-        distribution_k
+        distribution_k,
+        RTS_threshold
 ):
     random.seed(seed)
     environment = simpy.Environment()
     channel = Channel(
         simpy.PreemptiveResource(environment, capacity=1),
+        simpy.Resource(environment, capacity=1),
         simpy.Resource(environment, capacity=1),
         sum(number_of_stations.values()),
         number_of_gnb,
@@ -768,24 +819,28 @@ def run_simulation(
         airtime_control_NR
     )
 
+    global RTS_global_flag
+    RTS_global_flag = True
+
     transtime = transtime
 
+    # EDCA categories
     for i in range(1, sum(number_of_stations.values()) + 1):
         # 1st group - Background
         if i in range (1,number_of_stations["backgroundStations"]+1):
-            config_local = Config(config.data_size, 15, 1023, config.r_limit, config.mcs,7)
+            config_local = Config(config.data_size, 15, 1023, config.r_limit, config.mcs,7,RTS_threshold)
             Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(1023 + 1)},Queue=Queue)
         # 2nd group - Best Effort
         elif i in range (number_of_stations["backgroundStations"]+1,number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+1):
-            config_local = Config(config.data_size, config.cw_min, config.cw_max, config.r_limit, config.mcs,3)
+            config_local = Config(config.data_size, config.cw_min, 1023, config.r_limit, config.mcs,3,RTS_threshold)
             Station(environment, "Station {}".format(i), channel=channel, config=config_local,simulation_time=simulation_time,poisson_lambda=poisson_lambda,backoffs={key: {1: 0} for key in range(1023 + 1)},transtime=transtime,Queue=Queue)
         # 3rd group - Video
         elif i in range (number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+1,number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+number_of_stations["videoStations"]+1):
-            config_local = Config(config.data_size, 3, 15, config.r_limit, config.mcs, 2)
+            config_local = Config(config.data_size, 3, 15, config.r_limit, config.mcs, 2,RTS_threshold)
             Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(15 + 1)},Queue=Queue)
         # 4th group - Voice
         else:
-            config_local = Config(config.data_size, 3,7, config.r_limit, config.mcs, 2)
+            config_local = Config(config.data_size, 3,7, config.r_limit, config.mcs, 2,RTS_threshold)
             Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(7 + 1)},Queue=Queue)
 
     for i in range(1, number_of_gnb + 1):
@@ -835,7 +890,7 @@ def run_simulation(
     normalized_channel_efficiency_all = (channel_efficiency + channel_efficiency_NR) / time
 
     throughput=(channel.succeeded_transmissions * config.data_size * 8) / (simulation_time * 1000000)
-    print(config.data_size)
+
     thrpt_vc = (channel.succeeded_transmissions_vc * config.data_size * 8) / (simulation_time * 1000000)
     thrpt_vd = (channel.succeeded_transmissions_vd * config.data_size * 8) / (simulation_time * 1000000)
     thrpt_be = (channel.succeeded_transmissions_be * config.data_size * 8) / (simulation_time * 1000000)
@@ -879,7 +934,7 @@ def run_simulation(
         write_header = False
     with open(output_csv, mode='a', newline="") as result_file:
         result_adder = csv.writer(result_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        firstliner='Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcolWifi,ChannelOccupancyNR,ChannelEfficiencyNR,PcolNR,ChannelOccupancyAll,ChannelEfficiencyAll,' \
+        firstliner='Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcollWiFi,ChannelOccupancyNR,ChannelEfficiencyNR,PcollNR,ChannelOccupancyAll,ChannelEfficiencyAll,' \
                    'Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,cw_min,mcs,retryLimit,sync,lenLte,distribution_k'
 
         if write_header:
