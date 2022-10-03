@@ -64,21 +64,21 @@ def valid_two_simulations():
     viridis(0.0, 1.0, 2)
 
     # Simulation results parameters
-    domain = 'Payload'
+    domain = 'nMPDU'
     anti_domain = 'Throughput'
 
     sim1_label = "5G-Coex-SimPy"
     sim2_label = "ns-3"
 
-    sim1 = pd.read_csv('csvresults/VAL/RTS/payload/sp-rts-cts-v02.csv', delimiter=',')
-    sim2 = pd.read_csv('csvresults/VAL/RTS/payload/ns3-v2.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/VAL/80211ac/k/sp-k-v2.csv', delimiter=',')
+    sim2 = pd.read_csv('csvresults/VAL/80211ac/k/ns3-k-v2.csv', delimiter=',')
 
-    x_axis_description = "Payload [B]"
+    x_axis_description = "Number of MPDU's in an A-MPDU frame"
     y_axis_description = "Throughput [Mb/s]"
     linestyle="solid"
 
-    y_range = (0,50)
-    result_file_path = 'results/VAL/RTS/payload/rts-payload-thrpt--v2.svg'
+    y_range = (0,60)
+    result_file_path = 'results/VAL/ac/ac-k-v2.svg'
 
     # t-student parameter for confidence intervals
     alfa = 0.05

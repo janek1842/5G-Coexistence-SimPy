@@ -1,4 +1,5 @@
 import math
+import string
 
 MCS = {
     0: [6, 6],
@@ -11,7 +12,21 @@ MCS = {
     7: [54, 24],
 }
 
+MCS_ac = {
+    0: [6.5, 6.5],
+    1: [13, 13],
+    2: [19.5, 19.5],
+    3: [26, 26],
+    4: [39, 39],
+    5: [52, 52],
+    6: [58.5, 58.5],
+    7: [65, 65],
+    8: [78,78],
+}
+
 class Times:
+
+    WiFi_ac_enabled = False
 
     t_slot = 9  # [us]
     t_sifs = 16  # [us]
@@ -29,19 +44,26 @@ class Times:
     # overhead
     _overhead = 22  # [b]
 
-    def __init__(self, payload: int = 1472, mcs: int = 7, aifsn: int = 3):
+
+    def __init__(self, payload: int = 1472, mcs: int = 7, aifsn: int = 3,standard: string = "0"):
         self.payload = payload
         self.mcs = mcs
         # OFDM parameters
-        self.phy_data_rate = MCS[mcs][0] * pow(10, -6)  # [Mb/us] Possible values 6, 9, 12, 18, 24, 36, 48, 54
-        self.phy_ctr_rate = MCS[mcs][1] * pow(10, -6)  # [Mb/u]
+
+        if standard == "802.11a":
+            self.phy_data_rate = MCS[mcs][0] * pow(10, -6)  # [Mb/us] Possible values 6, 9, 12, 18, 24, 36, 48, 54
+            self.phy_ctr_rate = MCS[mcs][1] * pow(10, -6)  # [Mb/us]
+            self.data_rate = MCS[mcs][0]  # [b/us]
+            self.ctr_rate = MCS[mcs][1]  # [b/us]
+
+        elif standard == "802.11ac":
+            self.phy_data_rate = MCS_ac[mcs][0] * pow(10, -6)  # [Mb/us] Possible values 6, 9, 12, 18, 24, 36, 48, 54
+            self.phy_ctr_rate = MCS_ac[mcs][1] * pow(10, -6)  # [Mb/us]
+            self.data_rate = MCS_ac[mcs][0]  # [b/us]
+            self.ctr_rate = MCS_ac[mcs][1]  # [b/us]
 
         self.n_data = 4 * self.phy_data_rate  # [b/symbol]
         self.n_ctr = 4 * self.phy_ctr_rate  # [b/symbol]
-
-        self.data_rate = MCS[mcs][0]  # [b/us]
-        self.ctr_rate = MCS[mcs][1]  # [b/us]
-
         self.ofdm_preamble = 16  # [us]
         self.ofdm_signal = 24 / self.ctr_rate  # [us]
 
@@ -52,22 +74,23 @@ class Times:
         self.t_difs = aifsn * t_slot + t_sifs  # [us]
 
     # Data frame time
-    def get_ppdu_frame_time(self):
+    def get_ppdu_frame_time(self,k):
         msdu = self.payload * 8  # [b]
 
         # MacFrame
-        mac_frame = Times.mac_overhead + msdu  # [b]
+        mac_frame = k * Times.mac_overhead + msdu  # [b]
         # PPDU Padding
         ppdu_padding = math.ceil(
-            (Times._overhead + mac_frame) / self.n_data
-        ) * self.n_data - (Times._overhead + mac_frame)
+            (k*Times._overhead + mac_frame) / self.n_data
+        ) * self.n_data - (k*Times._overhead + mac_frame)
+
         # CPSDU Frame
         cpsdu = Times._overhead + mac_frame + ppdu_padding  # [b]
+
         # PPDU Frame
         ppdu = self.ofdm_preamble + self.ofdm_signal + cpsdu / self.data_rate  # [us]
 
         ppdu_tx_time = math.ceil(ppdu)
-
         return ppdu_tx_time  # [us]
 
     # ACK frame time with SIFS
@@ -75,7 +98,8 @@ class Times:
         ack = Times._overhead + Times.ack_size  # [b]
         ack = self.ofdm_preamble + self.ofdm_signal + ack / self.ctr_rate  # [us]
         ack_tx_time = Times.t_sifs + ack
-        return math.ceil(ack_tx_time)
+        # return math.ceil(ack_tx_time)
+        return 44
 
     def get_rts_cts_time(self):
         return Times.t_difs + 2 * Times.t_sifs + (20 * 8 / self.ctr_rate) + (14 * 8 / self.ctr_rate)
