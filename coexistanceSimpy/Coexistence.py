@@ -16,7 +16,7 @@ from scipy.stats import erlang,pareto,exponnorm,lognorm,triang
 from .Times import *
 from datetime import datetime
 
-output_csv = "csvresults/VAL/80211ac/k/sp-k-v2.csv"
+output_csv = "csvresults/VAL/80211ac/nss/sp-nss-v2.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
 
 typ_filename = "RS_coex_1sta_1wifi2.log"
@@ -58,6 +58,7 @@ class Config:
     RTS_threshold: int = 3000
     standard: string = "802.11a"
     nAMPDU: int = 1
+    nSS: int = 1
 
 @dataclass()
 class Config_NR:
@@ -102,7 +103,7 @@ class Station:
         self.backoffs = backoffs
         self.transtime = transtime
         self.config = config
-        self.times = Times(config.data_size, config.mcs,config.aifsn,config.standard)  # using Times script to get time calculations
+        self.times = Times(config.data_size, config.mcs,config.aifsn,config.standard,self.config.nSS)  # using Times script to get time calculations
         self.name = name  # name of the station
         self.env = env  # simpy environment
         self.col = random.choice(colors)  # color of output -- for future station distinction
@@ -141,7 +142,6 @@ class Station:
         if self.poisson_lambda is not None:
             self.start_generating()
         global RTS_global_flag
-
 
         while True:
             if len(self.Queue[self.name]) > 0 or self.poisson_lambda is None:
@@ -334,7 +334,6 @@ class Station:
     def generate_new_frame(self):
         frame_length = self.times.get_ppdu_frame_time(self.config.nAMPDU)
         #frame_length = self.transtime
-
         return Frame(frame_length, self.name, self.col, self.config.data_size, self.env.now)
 
     def sent_failed(self):
@@ -379,6 +378,7 @@ class Station:
         self.failed_transmissions_in_row = 0
         self.channel.bytes_sent += self.frame_to_send.data_size
         self.channel.airtime_data[self.name] += self.frame_to_send.frame_time
+
         return True
 
 class Gnb:
@@ -808,7 +808,8 @@ def run_simulation(
         distribution_k,
         RTS_threshold,
         wifi_standard,
-        nMPDU
+        nMPDU,
+        nSS
 ):
     random.seed(seed)
     environment = simpy.Environment()
@@ -830,24 +831,24 @@ def run_simulation(
     standard = wifi_standard
     transtime = transtime
     nAMPDU  = nMPDU
-
+    nSS = nSS
     # EDCA categories
     for i in range(1, sum(number_of_stations.values()) + 1):
         # 1st group - Background
         if i in range (1,number_of_stations["backgroundStations"]+1):
-            config_local = Config(config.data_size, 15, 1023, config.r_limit, config.mcs,7,RTS_threshold,standard,nAMPDU)
+            config_local = Config(config.data_size, 15, 1023, config.r_limit, config.mcs,7,RTS_threshold,standard,nAMPDU,nSS)
             Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(1023 + 1)},Queue=Queue)
         # 2nd group - Best Effort
         elif i in range (number_of_stations["backgroundStations"]+1,number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+1):
-            config_local = Config(config.data_size, config.cw_min, config.cw_max, config.r_limit, config.mcs,3,RTS_threshold,standard,nAMPDU)
+            config_local = Config(config.data_size, config.cw_min, config.cw_max, config.r_limit, config.mcs,3,RTS_threshold,standard,nAMPDU,nSS)
             Station(environment, "Station {}".format(i), channel=channel, config=config_local,simulation_time=simulation_time,poisson_lambda=poisson_lambda,backoffs={key: {1: 0} for key in range(config.cw_max + 1)},transtime=transtime,Queue=Queue)
         # 3rd group - Video
         elif i in range (number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+1,number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+number_of_stations["videoStations"]+1):
-            config_local = Config(config.data_size, 3, 15, config.r_limit, config.mcs, 2,RTS_threshold,standard,nAMPDU)
+            config_local = Config(config.data_size, 3, 15, config.r_limit, config.mcs, 2,RTS_threshold,standard,nAMPDU,nSS)
             Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(15 + 1)},Queue=Queue)
         # 4th group - Voice
         else:
-            config_local = Config(config.data_size, 3,7, config.r_limit, config.mcs, 2,RTS_threshold,standard,nAMPDU)
+            config_local = Config(config.data_size, 3,7, config.r_limit, config.mcs, 2,RTS_threshold,standard,nAMPDU,nSS)
             Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(7 + 1)},Queue=Queue)
 
     for i in range(1, number_of_gnb + 1):
@@ -934,6 +935,9 @@ def run_simulation(
     print("sync",config_nr.synchronization_slot_duration)
     print("JFE: ", jain_fair_index)
     print("distribution_k: ", distribution_k)
+    print("MCS: ",config.mcs)
+    print("nAMPDU: ", nAMPDU)
+    print("nSS: ", nSS)
     print("------------------------------------------------------------------------------------------")
 
     write_header = True
@@ -942,7 +946,7 @@ def run_simulation(
     with open(output_csv, mode='a', newline="") as result_file:
         result_adder = csv.writer(result_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         firstliner='Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcollWiFi,ChannelOccupancyNR,ChannelEfficiencyNR,PcollNR,ChannelOccupancyAll,ChannelEfficiencyAll,' \
-                   'Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,cw_min,mcs,retryLimit,sync,lenLte,distribution_k,nMPDU'
+                   'Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,cw_min,mcs,retryLimit,sync,lenLte,distribution_k,nMPDU,nss'
 
         if write_header:
             result_adder.writerow([firstliner.strip('"')])
@@ -952,7 +956,7 @@ def run_simulation(
              p_coll,
              normalized_channel_occupancy_time_NR, normalized_channel_efficiency_NR, p_coll_NR,
              normalized_channel_occupancy_time_all, normalized_channel_efficiency_all,throughput,config.data_size,simulation_time,jain_fair_index,beAirTime,vdAirTime,vcAirTime,bgAirTime,poisson_lambda,
-             thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,config.cw_min,config.mcs,config.r_limit,config_nr.synchronization_slot_duration,transtime,distribution_k,nMPDU])
+             thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,config.cw_min,config.mcs,config.r_limit,config_nr.synchronization_slot_duration,transtime,distribution_k,nMPDU,nSS])
 
 
 

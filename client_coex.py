@@ -16,7 +16,8 @@ def single_run(
         distribution_k,
         RTS_threshold,
         wifi_standard,
-        nAMPDUs
+        nAMPDUs,
+        nSS
 ):
 
     backoffs = {key: {sum(stations_number.values()): 0} for key in range(cw_max + 1)}
@@ -38,10 +39,10 @@ def single_run(
     payload_size = nAMPDUs * payload_size
 
     run_simulation(stations_number, gnb_number, seeds, simulation_time,
-                   Config(data_size=k*payload_size, cw_min=cw_min, cw_max=cw_max, r_limit=r_limit, mcs=mcs_value),
+                   Config(data_size=payload_size, cw_min=cw_min, cw_max=cw_max, r_limit=r_limit, mcs=mcs_value),
                    Config_NR(deter_period=16, observation_slot_duration=9, synchronization_slot_duration=sync,
                              max_sync_slot_desync=1000, min_sync_slot_desync=0, M=3, cw_min=cw_min, cw_max=cw_max,retry_limit=r_limit,mcot=6),
-                   backoffs, airtime_data, airtime_control, airtime_data_NR, airtime_control_NR,poisson_lambda,transtime=transtime,Queue=Queue,distribution_k=distribution_k,RTS_threshold=RTS_threshold,wifi_standard=wifi_standard,nMPDU=nAMPDUs)
+                   backoffs, airtime_data, airtime_control, airtime_data_NR, airtime_control_NR,poisson_lambda,transtime=transtime,Queue=Queue,distribution_k=distribution_k,RTS_threshold=RTS_threshold,wifi_standard=wifi_standard,nMPDU=nAMPDUs,nSS=nSS)
 
 if __name__ == "__main__":
 
@@ -55,11 +56,11 @@ if __name__ == "__main__":
     # 0.005,0.01,0.015,0.02,0.025,0.03,0.035,0.04,0.045,0.05
     # 0.001,0.002,0.003,0.004,0.005,0.006,0.007,0.008,0.009,0.01,0.012,0.014
     for var in list:
-        for k in [5,10,15,20,25,30,35]:
+        for k in [1,2,3,4]:
 
             stationsConfig = {
                 "backgroundStations": 0,
-                "bestEffortStations": 12,
+                "bestEffortStations": 4,
                 "videoStations": 0,
                 "voiceStations": 0
             }
@@ -68,17 +69,18 @@ if __name__ == "__main__":
                        stations_number=stationsConfig,
                        gnb_number=0,
                        simulation_time=10,
-                       payload_size=300,
+                       payload_size=1500,
                        cw_min=15,
                        cw_max=1023,
                        r_limit=7,
-                       mcs_value=3,
+                       mcs_value=8,
                        poisson_lambda=None,
                        sync=0,
                        transtime=0,
                        distribution_k = 1,
-                       RTS_threshold = 20000000000,
+                       RTS_threshold = 200000000000,
                        wifi_standard = "802.11ac", # 802.11ac or 802.11a
-                       nAMPDUs = k
+                       nAMPDUs = 1,
+                       nSS = 3
                        )
 

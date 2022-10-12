@@ -64,21 +64,21 @@ def valid_two_simulations():
     viridis(0.0, 1.0, 2)
 
     # Simulation results parameters
-    domain = 'nMPDU'
+    domain = 'nss'
     anti_domain = 'Throughput'
 
-    sim1_label = "5G-Coex-SimPy"
-    sim2_label = "ns-3"
+    sim1_label = "ns-3"
+    sim2_label = "5G-Coex-SimPy"
 
-    sim1 = pd.read_csv('csvresults/VAL/80211ac/k/sp-k-v2.csv', delimiter=',')
-    sim2 = pd.read_csv('csvresults/VAL/80211ac/k/ns3-k-v2.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/VAL/80211ac/nss/ns3-nss-v1.csv', delimiter=',')
+    sim2 = pd.read_csv('csvresults/VAL/80211ac/nss/sp-nss-v1.csv', delimiter=',')
 
-    x_axis_description = "Number of MPDU's in an A-MPDU frame"
+    x_axis_description = "Number of Spatial Streams"
     y_axis_description = "Throughput [Mb/s]"
     linestyle="solid"
 
-    y_range = (0,60)
-    result_file_path = 'results/VAL/ac/ac-k-v2.svg'
+    y_range = (0,100)
+    result_file_path = 'results/VAL/ac/nSS/sp-nss-v1.svg'
 
     # t-student parameter for confidence intervals
     alfa = 0.05
@@ -182,10 +182,10 @@ def print_four_simulations():
     viridis(0.0, 1.0, 2)
 
     domain = 'WiFi'
-    anti_domain_1 =  'vcAirTime'
-    anti_domain_2 =  'vdAirTime'
-    anti_domain_3 =  'beAirTime'
-    anti_domain_4 =  'bgAirTime'
+    anti_domain_1 =  'thrpt_vc'
+    anti_domain_2 =  'thrpt_vd'
+    anti_domain_3 =  'thrpt_be'
+    anti_domain_4 =  'thrpt_bg'
 
     sim1_1_label = "5G-Coex-SimPy: AC_VO"
     sim1_2_label = "5G-Coex-SimPy: AC_VI"
@@ -193,11 +193,11 @@ def print_four_simulations():
     sim1_4_label = "5G-Coex-SimPy: AC_BK"
 
     # Simulation results parameters
-    sim1 = pd.read_csv('csvresults/VAL/LAMBDA/lambda-edca/lambda-edca-st.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/VAL/LAMBDA/lambda-edca/lambda-edca-st-v1.csv', delimiter=',')
 
     OX_description = "Total number of stations"
     OY_description = "Channel occupancy"
-    result_file = 'results/VAL/LAMBDA/lambda-edca/lambda-st-edca.svg'
+    result_file = 'results/VAL/LAMBDA/lambda-edca/lambda-st-edca-v1.svg'
 
     # t-student parameter for confidence intervals
     alfa = 0.05
@@ -221,16 +221,16 @@ def print_four_simulations():
     sim1_4_err = sim1_4_std / np.sqrt(sim1_4_n) * t.ppf(1 - alfa / 2, sim1_4_n - 1)
 
     # Results grouping
-    sim1_1 = sim1.groupby([domain])[anti_domain_1].mean() / 3e6
-    sim1_2 = sim1.groupby([domain])[anti_domain_2].mean() / 3e6
-    sim1_3 = sim1.groupby([domain])[anti_domain_3].mean() / 3e6
-    sim1_4 = sim1.groupby([domain])[anti_domain_4].mean() / 3e6
+    sim1_1 = sim1.groupby([domain])[anti_domain_1].mean()
+    sim1_2 = sim1.groupby([domain])[anti_domain_2].mean()
+    sim1_3 = sim1.groupby([domain])[anti_domain_3].mean()
+    sim1_4 = sim1.groupby([domain])[anti_domain_4].mean()
 
     # Results plotting
-    ax1 = sim1_1.plot(marker='o', legend=True , ylim=(0,1), mfc='none')
-    ax2 = sim1_2.plot(ax=ax1, marker='o', legend=True )
-    ax3 = sim1_3.plot(ax=ax2, marker='o', legend=True , mfc='none')
-    ax4 = sim1_4.plot(ax=ax3, marker='o', legend=True)
+    ax1 = sim1_1.plot(marker='o', legend=True , ylim=(0,50), mfc='none',yerr=sim1_1_err,capsize=4)
+    ax2 = sim1_2.plot(ax=ax1, marker='o', legend=True,yerr=sim1_2_err,capsize=4 )
+    ax3 = sim1_3.plot(ax=ax2, marker='o', legend=True , mfc='none',yerr=sim1_3_err,capsize=4)
+    ax4 = sim1_4.plot(ax=ax3, marker='o', legend=True,yerr=sim1_4_err,capsize=4)
 
     # log scale option
     #ax4.set_xscale('log')
