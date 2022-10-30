@@ -31,9 +31,10 @@ def single_run(
     Queue = {"Station {}".format(i): [] for i in range(1, sum(stations_number.values()) + 1)}
     Queue.update({"Gnb {}".format(i): [] for i in range(1, gnb_number + 1)})
 
-    # random packet size generation (ERLANG)
+    # random packet size generation (ERLANG DISTRIBUTION)
     #k = erlang.rvs(distribution_k,scale=1)
     k = 1
+    payload_size = k * payload_size
 
     # 802.11ac Aggregation
     payload_size = nAMPDUs * payload_size
@@ -48,39 +49,40 @@ if __name__ == "__main__":
 
     #performing multiple runs
     list = []
-    for radn in range(1,10):
+    for radn in range(1,100):
         n = random.randint(10, 1000)
         list.append(n)
 
     print("SEEDS: ",list)
     # 0.005,0.01,0.015,0.02,0.025,0.03,0.035,0.04,0.045,0.05
+    # 9, 18, 36, 63, 125, 250, 500, or 1000 μs
     # 0.001,0.002,0.003,0.004,0.005,0.006,0.007,0.008,0.009,0.01,0.012,0.014
     for var in list:
-        for k in [1,2,3,4]:
+        for k in [300,600,900,1200,1500,1800]:
 
             stationsConfig = {
-                "backgroundStations": 0,
+                "backgroundStations": 4,
                 "bestEffortStations": 4,
-                "videoStations": 0,
-                "voiceStations": 0
+                "videoStations": 4,
+                "voiceStations": 4
             }
 
             single_run(seeds=var,
                        stations_number=stationsConfig,
                        gnb_number=0,
                        simulation_time=10,
-                       payload_size=1500,
+                       payload_size=k,
                        cw_min=15,
                        cw_max=1023,
                        r_limit=7,
-                       mcs_value=8,
-                       poisson_lambda=None,
+                       mcs_value=7,
+                       poisson_lambda=0.3,
                        sync=0,
                        transtime=0,
                        distribution_k = 1,
-                       RTS_threshold = 200000000000,
-                       wifi_standard = "802.11ac", # 802.11ac or 802.11a
+                       RTS_threshold = 9000000,
+                       wifi_standard = "802.11a", # 802.11ac or 802.11a
                        nAMPDUs = 1,
-                       nSS = 3
+                       nSS = 1
                        )
 

@@ -16,7 +16,7 @@ from scipy.stats import erlang,pareto,exponnorm,lognorm,triang
 from .Times import *
 from datetime import datetime
 
-output_csv = "csvresults/VAL/80211ac/nss/sp-nss-v2.csv"
+output_csv = "csvresults/VAL/EDCA/lambda-edca-payload/lambda-edca-payload-v2.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
 
 typ_filename = "RS_coex_1sta_1wifi2.log"
@@ -170,8 +170,8 @@ class Station:
             elif bool([a for a in self.Queue.values() if a == []]):
                 yield self.env.timeout(1000)
             else:
-                yield self.env.timeout(1000)
-                #self.env.step()
+                #yield self.env.timeout(1000)
+                self.env.step()
 
     def wait_back_off(self):
 
@@ -184,36 +184,6 @@ class Station:
                     yield req
 
                 self.back_off_time += self.times.t_difs  # add DIFS time
-
-
-                # if RTS_global_flag:
-                #     print("me")
-                #     yield self.env.timeout(self.times.t_difs)
-                #     yield self.env.timeout(20 * 8 / 24)
-                #     yield self.env.timeout(self.times.t_sifs)
-                #     yield self.env.timeout(14 * 8 / 24)
-                #     yield self.env.timeout(self.times.t_sifs)
-
-                # if self.channel.rts_lock.count==0:
-                #     with self.channel.rts_lock.request() as rtsReq:
-                #         yield rtsReq
-                #         yield self.env.timeout(self.times.t_difs)
-                #         yield self.env.timeout(20 * 8 / 24)
-                #         yield self.env.timeout(self.times.t_sifs)
-                #         yield self.env.timeout(14 * 8 / 24)
-                #         yield self.env.timeout(self.times.t_sifs)
-                #         self.channel.airtime_control[self.name] = self.times.t_difs + 2 * self.times.t_sifs + (20*8/24) + (14*8/24)
-                #
-
-
-
-                # else:
-                #     yield self.env.timeout(self.times.t_difs+self.frame_to_send.frame_time + self.times.t_difs+2*self.times.t_sifs+(20*8/24)+(14*8/24))
-                #     self.wait_back_off()
-
-                    # except simpy.Interrupt:
-                    #     self.channel.airtime_control[self.name] = self.times.t_difs + 2 * self.times.t_sifs + (20 * 8 / 24) + (14 * 8 / 24)
-                    #     yield self.env.timeout(self.times.t_difs+self.frame_to_send.frame_time + self.times.t_difs+2*self.times.t_sifs+(20*8/24)+(14*8/24))
 
                 log(self, f"Starting to wait backoff (with DIFS): ({self.back_off_time})u...")
                 self.first_interrupt = True
@@ -251,6 +221,7 @@ class Station:
     def send_frame(self):
 
         self.channel.tx_list.append(self)  # add station to currently transmitting list
+
         res = self.channel.tx_queue.request(
             priority=(big_num - self.frame_to_send.frame_time))  # create request basing on this station frame length
 
@@ -313,7 +284,6 @@ class Station:
         return was_sent
 
     def check_collision(self):  # check if the collision occurred
-
         if (len(self.channel.tx_list) + len(self.channel.tx_list_NR)) > 1 or (len(self.channel.tx_list) + len(self.channel.tx_list_NR)) == 0 :
             self.sent_failed()
             return False
@@ -344,8 +314,8 @@ class Station:
         self.failed_transmissions_in_row += 1
         log(self, self.channel.failed_transmissions)
 
-        if self.frame_to_send.number_of_retransmissions > 7:
-            #self.frame_to_send = self.generate_new_frame()
+        if self.frame_to_send.number_of_retransmissions > self.config.r_limit:
+            self.frame_to_send = self.generate_new_frame()
             self.failed_transmissions_in_row = 0
 
     def packet_dropped(self):
@@ -356,7 +326,7 @@ class Station:
         log(self, self.channel.failed_transmissions)
 
         if self.frame_to_send.number_of_retransmissions > self.config.r_limit:
-            #self.frame_to_send = self.generate_new_frame()
+            self.frame_to_send = self.generate_new_frame()
             self.failed_transmissions_in_row = 0
 
     def sent_completed(self):
@@ -742,9 +712,15 @@ class Channel:
     succeeded_transmissions_vc: int = 0
     succeeded_transmissions_vd: int = 0
 
+    rts_list: List[Station] = field(default_factory=list)
+    succeeded_rts: int = 0
+    failed_rts: int = 0
+
     bytes_sent: int = 0  # total bytes sent
     failed_transmissions_NR: int = 0  # total failed transmissions
     succeeded_transmissions_NR: int = 0  # total succeeded transmissions
+
+
 
 
 @dataclass()
@@ -938,6 +914,7 @@ def run_simulation(
     print("MCS: ",config.mcs)
     print("nAMPDU: ", nAMPDU)
     print("nSS: ", nSS)
+    # print(channel.failed_rts/(channel.failed_rts+channel.succeeded_rts))
     print("------------------------------------------------------------------------------------------")
 
     write_header = True

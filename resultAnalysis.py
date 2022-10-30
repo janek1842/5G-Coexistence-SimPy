@@ -7,6 +7,7 @@ from matplotlib import cm
 import math
 import cycler
 from scipy.stats import t
+from matplotlib.ticker import MaxNLocator
 
 n = 4
 color = mpl.cm.viridis(np.linspace(0.0, 1.0, n))
@@ -23,17 +24,17 @@ def valid_single_simulation():
     viridis(0.0, 1.0, 2)
 
     # Simulation results parameters
-    domain = 'lambda'
-    anti_domain = 'beAirTime'
+    domain = 'Throughp'
+    anti_domain = 'JainFairIndex'
 
     sim1_label = "5G-Coex-SimPy"
-    sim1 = pd.read_csv('csvresults/VAL/LAMBDA/peak/peak_simulation_v1.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/VAL/JFI/slot/slot-v2.csv', delimiter=',')
 
-    x_axis_description = "Lambda"
-    y_axis_description = "Channel occupancy"
+    x_axis_description = "Synchronization slot duration [\u03BCs]"
+    y_axis_description = "Jain's fairness index"
 
-    y_range = (0, 0.7)
-    result_file_path = 'results/VAL/lambda/peak/peak-v1.svg'
+    y_range = (0, 1)
+    result_file_path = 'results/VAL/JFI/jfi-slot-v2.svg'
 
     # t-student parameter for confidence intervals
     alfa = 0.05
@@ -52,6 +53,7 @@ def valid_single_simulation():
 
     # Results plotting
     sim1_plot = sim1.plot(marker='o', legend=True,ylim=y_range,yerr=sim1_err,capsize=4)
+    sim1_plot.set_xscale('log')
 
     sim1_plot.legend([sim1_label])
     sim1_plot.set_xlabel(x_axis_description, fontsize=14)
@@ -64,21 +66,21 @@ def valid_two_simulations():
     viridis(0.0, 1.0, 2)
 
     # Simulation results parameters
-    domain = 'nss'
+    domain = 'nMPDU'
     anti_domain = 'Throughput'
 
     sim1_label = "ns-3"
     sim2_label = "5G-Coex-SimPy"
 
-    sim1 = pd.read_csv('csvresults/VAL/80211ac/nss/ns3-nss-v1.csv', delimiter=',')
-    sim2 = pd.read_csv('csvresults/VAL/80211ac/nss/sp-nss-v1.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/VAL/80211ac/k/ns3-k-v2.csv', delimiter=',')
+    sim2 = pd.read_csv('csvresults/VAL/80211ac/k/sp-k-v2.csv', delimiter=',')
 
-    x_axis_description = "Number of Spatial Streams"
+    x_axis_description = "Number of MPDUs in an A-MPDU frame"
     y_axis_description = "Throughput [Mb/s]"
-    linestyle="solid"
+    linestyle="dotted"
 
     y_range = (0,100)
-    result_file_path = 'results/VAL/ac/nSS/sp-nss-v1.svg'
+    result_file_path = 'results/VAL/ac/mcs/ac-k-v2.svg'
 
     # t-student parameter for confidence intervals
     alfa = 0.05
@@ -96,12 +98,15 @@ def valid_two_simulations():
     sim2_err = sim2_std / np.sqrt(sim2_n) * t.ppf(1-alfa/2,sim2_n-1)
 
     # Results grouping
+
     sim1 = sim1.groupby([domain])[anti_domain].mean()
     sim2 = sim2.groupby([domain])[anti_domain].mean()
 
     # Results plotting
     sim1_plot = sim1.plot(marker='o', legend=True, capsize=4, yerr = sim1_err,ylim=y_range,linestyle=linestyle,mfc='none')
     sim2_plot = sim2.plot(ax=sim1_plot, marker='x', legend=True, capsize=4, yerr = sim2_err,linestyle=linestyle)
+
+    # sim2_plot.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     # log scale
     #sim1_plot.set_xscale('log')
@@ -181,11 +186,11 @@ def valid_four_simulations():
 def print_four_simulations():
     viridis(0.0, 1.0, 2)
 
-    domain = 'WiFi'
-    anti_domain_1 =  'thrpt_vc'
-    anti_domain_2 =  'thrpt_vd'
-    anti_domain_3 =  'thrpt_be'
-    anti_domain_4 =  'thrpt_bg'
+    domain = 'lambda'
+    anti_domain_1 =  'vcAirTime'
+    anti_domain_2 =  'vdAirTime'
+    anti_domain_3 =  'beAirTime'
+    anti_domain_4 =  'bgAirTime'
 
     sim1_1_label = "5G-Coex-SimPy: AC_VO"
     sim1_2_label = "5G-Coex-SimPy: AC_VI"
@@ -193,11 +198,11 @@ def print_four_simulations():
     sim1_4_label = "5G-Coex-SimPy: AC_BK"
 
     # Simulation results parameters
-    sim1 = pd.read_csv('csvresults/VAL/LAMBDA/lambda-edca/lambda-edca-st-v1.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/VAL/LAMBDA/lambda-edca/lambda-edca-lambda-v2.csv', delimiter=',')
 
-    OX_description = "Total number of stations"
+    OX_description = "Lambda"
     OY_description = "Channel occupancy"
-    result_file = 'results/VAL/LAMBDA/lambda-edca/lambda-st-edca-v1.svg'
+    result_file = 'results/VAL/LAMBDA/lambda-edca/lambda-edca-cot-v2.svg'
 
     # t-student parameter for confidence intervals
     alfa = 0.05
@@ -227,7 +232,7 @@ def print_four_simulations():
     sim1_4 = sim1.groupby([domain])[anti_domain_4].mean()
 
     # Results plotting
-    ax1 = sim1_1.plot(marker='o', legend=True , ylim=(0,50), mfc='none',yerr=sim1_1_err,capsize=4)
+    ax1 = sim1_1.plot(marker='o', legend=True , ylim=(0,0.5), mfc='none',yerr=sim1_1_err,capsize=4)
     ax2 = sim1_2.plot(ax=ax1, marker='o', legend=True,yerr=sim1_2_err,capsize=4 )
     ax3 = sim1_3.plot(ax=ax2, marker='o', legend=True , mfc='none',yerr=sim1_3_err,capsize=4)
     ax4 = sim1_4.plot(ax=ax3, marker='o', legend=True,yerr=sim1_4_err,capsize=4)
@@ -244,10 +249,10 @@ def print_four_simulations():
 
 
 if __name__ == "__main__":
-    #print_four_simulations()
+    print_four_simulations()
     #valid_single_simulation()
     #valid_four_simulations()
-    valid_two_simulations()
+    #valid_two_simulations()
 
 
 

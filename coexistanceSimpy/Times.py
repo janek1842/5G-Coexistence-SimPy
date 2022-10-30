@@ -90,20 +90,22 @@ class Times:
         # PPDU Frame
         ppdu = self.ofdm_preamble + self.ofdm_signal + cpsdu / self.data_rate  # [us]
 
-        ppdu_tx_time = math.ceil(ppdu) + self.nss * 4
+        ppdu_tx_time = math.ceil(ppdu)
         #print(ppdu_tx_time)
-        return 96
 
-        #return ppdu_tx_time  # [us]
+        return ppdu_tx_time  # [us]
 
     # ACK frame time with SIFS
     def get_ack_frame_time(self):
         ack = Times._overhead + Times.ack_size  # [b]
         ack = self.ofdm_preamble + self.ofdm_signal + ack / self.ctr_rate  # [us]
         ack_tx_time = Times.t_sifs + ack
-
         return math.ceil(ack_tx_time)
         #return 28+16
 
+
     def get_rts_cts_time(self):
-        return Times.t_difs + 2 * Times.t_sifs + (20 * 8 / self.ctr_rate) + (14 * 8 / self.ctr_rate)
+        return 2 * Times.t_sifs + (14 * 8 / self.ctr_rate) + Times.t_difs + (20 * 8 / self.ctr_rate)
+
+
+
