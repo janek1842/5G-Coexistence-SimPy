@@ -16,7 +16,7 @@ from scipy.stats import erlang,pareto,exponnorm,lognorm,triang
 from .Times import *
 from datetime import datetime
 
-output_csv = "csvresults/VAL/EDCA/lambda-edca-payload/lambda-edca-payload-v2.csv"
+output_csv = "csvresults/VAL/buffer/buffer-v2.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
 
 typ_filename = "RS_coex_1sta_1wifi2.log"
@@ -98,7 +98,8 @@ class Station:
             simulation_time: int = 10,
             poisson_lambda: int = 10,
             backoffs: dict = {},
-            Queue: dict = {}
+            Queue: dict = {},
+            buffer_size: int = 10
     ):
         self.backoffs = backoffs
         self.transtime = transtime
@@ -127,6 +128,7 @@ class Station:
         self.sumTime =0
         self.simulation_time = simulation_time
         self.Queue = Queue
+        self.buffer_size = buffer_size
 
     def wait_for_frame(self,time_to_wait):
         yield self.env.timeout(time_to_wait)
@@ -134,8 +136,10 @@ class Station:
 
     def start_generating(self):
         self.sumTime = numpy.random.exponential(1 / self.poisson_lambda) * 1000
-        self.Queue[self.name].append(1)
-        self.frame_to_send = self.generate_new_frame()
+        if len(self.Queue[self.name]) <= self.buffer_size:
+            self.Queue[self.name].append(1)
+            self.frame_to_send = self.generate_new_frame()
+
         self.env.process(self.wait_for_frame(self.sumTime))
 
     def start(self):
@@ -361,9 +365,11 @@ class Gnb:
             transtime,
             backoffs,
             poisson_lambda,
-            Queue
+            Queue,
+            buffer_size
     ):
         self.config_nr = config_nr
+        self.buffer_size = buffer_size
         self.transtime = transtime
         # self.times = Times(config.data_size, config.mcs)  # using Times script to get time calculations
         self.name = name  # name of the station
@@ -401,8 +407,9 @@ class Gnb:
 
     def start_generating(self):
         self.sumTime = numpy.random.exponential(1 / self.poisson_lambda) * 1000
-        self.Queue[self.name].append(1)
-        self.transmission_to_send=self.gen_new_transmission()
+        if len(self.Queue[self.name]) < self.buffer_size:
+            self.Queue[self.name].append(1)
+            self.transmission_to_send=self.gen_new_transmission()
         self.env.process(self.wait_for_frame())
 
     def start(self):
@@ -785,7 +792,8 @@ def run_simulation(
         RTS_threshold,
         wifi_standard,
         nMPDU,
-        nSS
+        nSS,
+        buffer_size,
 ):
     random.seed(seed)
     environment = simpy.Environment()
@@ -808,27 +816,28 @@ def run_simulation(
     transtime = transtime
     nAMPDU  = nMPDU
     nSS = nSS
+
     # EDCA categories
     for i in range(1, sum(number_of_stations.values()) + 1):
         # 1st group - Background
         if i in range (1,number_of_stations["backgroundStations"]+1):
             config_local = Config(config.data_size, 15, 1023, config.r_limit, config.mcs,7,RTS_threshold,standard,nAMPDU,nSS)
-            Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(1023 + 1)},Queue=Queue)
+            Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(1023 + 1)},Queue=Queue,buffer_size=buffer_size)
         # 2nd group - Best Effort
         elif i in range (number_of_stations["backgroundStations"]+1,number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+1):
             config_local = Config(config.data_size, config.cw_min, config.cw_max, config.r_limit, config.mcs,3,RTS_threshold,standard,nAMPDU,nSS)
-            Station(environment, "Station {}".format(i), channel=channel, config=config_local,simulation_time=simulation_time,poisson_lambda=poisson_lambda,backoffs={key: {1: 0} for key in range(config.cw_max + 1)},transtime=transtime,Queue=Queue)
+            Station(environment, "Station {}".format(i), channel=channel, config=config_local,simulation_time=simulation_time,poisson_lambda=poisson_lambda,backoffs={key: {1: 0} for key in range(config.cw_max + 1)},transtime=transtime,Queue=Queue,buffer_size=buffer_size)
         # 3rd group - Video
         elif i in range (number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+1,number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+number_of_stations["videoStations"]+1):
             config_local = Config(config.data_size, 3, 15, config.r_limit, config.mcs, 2,RTS_threshold,standard,nAMPDU,nSS)
-            Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(15 + 1)},Queue=Queue)
+            Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(15 + 1)},Queue=Queue,buffer_size=buffer_size)
         # 4th group - Voice
         else:
             config_local = Config(config.data_size, 3,7, config.r_limit, config.mcs, 2,RTS_threshold,standard,nAMPDU,nSS)
-            Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(7 + 1)},Queue=Queue)
+            Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(7 + 1)},Queue=Queue,buffer_size=buffer_size)
 
     for i in range(1, number_of_gnb + 1):
-        Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr,transtime=transtime,backoffs = {key: {1: 0} for key in range(1023 + 1)},poisson_lambda=poisson_lambda,Queue=Queue)
+        Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr,transtime=transtime,backoffs = {key: {1: 0} for key in range(1023 + 1)},poisson_lambda=poisson_lambda,Queue=Queue,buffer_size=buffer_size)
 
     environment.run(until=simulation_time * 1000000)
 
@@ -923,7 +932,7 @@ def run_simulation(
     with open(output_csv, mode='a', newline="") as result_file:
         result_adder = csv.writer(result_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         firstliner='Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcollWiFi,ChannelOccupancyNR,ChannelEfficiencyNR,PcollNR,ChannelOccupancyAll,ChannelEfficiencyAll,' \
-                   'Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,cw_min,mcs,retryLimit,sync,lenLte,distribution_k,nMPDU,nss'
+                   'Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,cw_min,mcs,retryLimit,sync,lenLte,distribution_k,nMPDU,nss,buffer'
 
         if write_header:
             result_adder.writerow([firstliner.strip('"')])
@@ -933,7 +942,7 @@ def run_simulation(
              p_coll,
              normalized_channel_occupancy_time_NR, normalized_channel_efficiency_NR, p_coll_NR,
              normalized_channel_occupancy_time_all, normalized_channel_efficiency_all,throughput,config.data_size,simulation_time,jain_fair_index,beAirTime,vdAirTime,vcAirTime,bgAirTime,poisson_lambda,
-             thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,config.cw_min,config.mcs,config.r_limit,config_nr.synchronization_slot_duration,transtime,distribution_k,nMPDU,nSS])
+             thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,config.cw_min,config.mcs,config.r_limit,config_nr.synchronization_slot_duration,transtime,distribution_k,nMPDU,nSS,buffer_size])
 
 
 

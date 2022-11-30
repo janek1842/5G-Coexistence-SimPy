@@ -9,7 +9,7 @@ import cycler
 from scipy.stats import t
 from matplotlib.ticker import MaxNLocator
 
-n = 4
+n = 8
 color = mpl.cm.viridis(np.linspace(0.0, 1.0, n))
 plt.rcParams['axes.prop_cycle'] = cycler.cycler(color=color)
 
@@ -21,20 +21,20 @@ def viridis(a, b, color_amount):
 # My validations
 
 def valid_single_simulation():
-    viridis(0.0, 1.0, 2)
+    viridis(0.0, 2.0, 2)
 
     # Simulation results parameters
-    domain = 'Throughp'
-    anti_domain = 'JainFairIndex'
+    domain = 'WiFi'
+    anti_domain = 'Throughput'
 
     sim1_label = "5G-Coex-SimPy"
-    sim1 = pd.read_csv('csvresults/VAL/JFI/slot/slot-v2.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/VAL/STD/stations/sp-st-erlang-v2.csv', delimiter=',')
 
-    x_axis_description = "Synchronization slot duration [\u03BCs]"
-    y_axis_description = "Jain's fairness index"
+    x_axis_description = "Total number of stations"
+    y_axis_description = "Throughput [Mb/s]"
 
-    y_range = (0, 1)
-    result_file_path = 'results/VAL/JFI/jfi-slot-v2.svg'
+    y_range = (0, 50)
+    result_file_path = 'results/VAL/STD/stations/erlang-stations-v2.svg'
 
     # t-student parameter for confidence intervals
     alfa = 0.05
@@ -53,7 +53,8 @@ def valid_single_simulation():
 
     # Results plotting
     sim1_plot = sim1.plot(marker='o', legend=True,ylim=y_range,yerr=sim1_err,capsize=4)
-    sim1_plot.set_xscale('log')
+    sim1_plot.xaxis.set_major_locator(MaxNLocator(integer=True))
+    #sim1_plot.set_xscale('log')
 
     sim1_plot.legend([sim1_label])
     sim1_plot.set_xlabel(x_axis_description, fontsize=14)
@@ -66,21 +67,21 @@ def valid_two_simulations():
     viridis(0.0, 1.0, 2)
 
     # Simulation results parameters
-    domain = 'nMPDU'
+    domain = 'WiFi'
     anti_domain = 'Throughput'
 
-    sim1_label = "ns-3"
+    sim1_label = "MATLAB"
     sim2_label = "5G-Coex-SimPy"
 
-    sim1 = pd.read_csv('csvresults/VAL/80211ac/k/ns3-k-v2.csv', delimiter=',')
-    sim2 = pd.read_csv('csvresults/VAL/80211ac/k/sp-k-v2.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/VAL/NRu-gap/stations/matlab-stations-v1.csv', delimiter=',')
+    sim2 = pd.read_csv('csvresults/VAL/NRu-gap/stations/sp-stations-v1.csv', delimiter=',')
 
-    x_axis_description = "Number of MPDUs in an A-MPDU frame"
-    y_axis_description = "Throughput [Mb/s]"
-    linestyle="dotted"
+    x_axis_description = "CWmin"
+    y_axis_description = "Jain's fairness index"
+    linestyle="solid"
 
-    y_range = (0,100)
-    result_file_path = 'results/VAL/ac/mcs/ac-k-v2.svg'
+    y_range = (0,1)
+    result_file_path = 'results/VAL/NRu-gap/stations/eff/eff-stations-v1.svg'
 
     # t-student parameter for confidence intervals
     alfa = 0.05
@@ -106,10 +107,10 @@ def valid_two_simulations():
     sim1_plot = sim1.plot(marker='o', legend=True, capsize=4, yerr = sim1_err,ylim=y_range,linestyle=linestyle,mfc='none')
     sim2_plot = sim2.plot(ax=sim1_plot, marker='x', legend=True, capsize=4, yerr = sim2_err,linestyle=linestyle)
 
-    # sim2_plot.xaxis.set_major_locator(MaxNLocator(integer=True))
+    sim2_plot.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     # log scale
-    #sim1_plot.set_xscale('log')
+    sim1_plot.set_xscale('log')
 
     sim2_plot.legend([sim1_label,sim2_label])
     sim2_plot.set_xlabel(x_axis_description, fontsize=14)
@@ -121,25 +122,25 @@ def valid_two_simulations():
 def valid_four_simulations():
     viridis(0.0, 1.0, 2)
 
-    domain = 'retryLimit'
-    anti_domain_1 = 'PcollNR'
-    anti_domain_2 = 'PcollWiFi'
+    domain = 'WiFi'
+    anti_domain_1 = 'thrpt_be'
+    anti_domain_2 = 'thrpt_bg'
 
-    sim1_1_label = "MATLAB: NR-U"
-    sim1_2_label = "MATLAB: WiFi"
-    sim2_1_label = "5G-Coex-SimPy: NR-U"
-    sim2_2_label = "5G-Coex-SimPy: WiFi"
+    sim1_1_label = "ns-3: AC_BE"
+    sim1_2_label = "ns-3: AC_BK"
+    sim2_1_label = "5G-Coex-SimPy: AC_BE"
+    sim2_2_label = "5G-Coex-SimPy: AC_BK"
 
     # Simulation results parameters
-    sim1 = pd.read_csv('csvresults/VAL/Coex/r/matlab-coex-r-v1.csv', delimiter=',')
-    sim2 = pd.read_csv('csvresults/VAL/Coex/r/coex-r-v1.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/VAL/EDCA/stations/v1/ns3-beandbg-v1.csv', delimiter=',')
+    sim2 = pd.read_csv('csvresults/VAL/EDCA/stations/v1/thrpt-st-beandbg-v1.csv', delimiter=',')
 
-    OX_description = "Retry limit"
-    OY_description = "Collision probability"
-    result_file='results/VAL/Coex/r/coex-r-cp-v1.svg'
+    OX_description = "Total number of stations"
+    OY_description = "Throughput [Mb/s]"
+    result_file='results/VAL/EDCA/stations/thrpt/stations-beandbg-v1.svg'
 
-    lim_range = (0,1)
-    linestyle = "dashed"
+    lim_range = (0,50)
+    linestyle = "solid"
     # t-student parameter for confidence intervals
     alfa = 0.05
 
@@ -173,6 +174,7 @@ def valid_four_simulations():
     ax3 = sim2_1.plot(ax=ax2,marker='o', legend=True,yerr=sim2_1_err,capsize=4,mfc='none',linestyle=linestyle)
     ax4 = sim2_2.plot(ax=ax3, marker='o', legend=True,yerr=sim2_2_err,capsize=4,mfc='none',linestyle=linestyle)
 
+    ax4.xaxis.set_major_locator(MaxNLocator(integer=True))
     # log scale option
     #ax4.set_xscale('log')
 
@@ -184,7 +186,7 @@ def valid_four_simulations():
     plt.savefig(result_file)
 
 def print_four_simulations():
-    viridis(0.0, 1.0, 2)
+    viridis(0.0, 2.0, 2)
 
     domain = 'lambda'
     anti_domain_1 =  'vcAirTime'
@@ -247,13 +249,93 @@ def print_four_simulations():
     plt.tight_layout()
     plt.savefig(result_file)
 
+def print_buffer_simulations():
+    viridis(1.1, 0, 4)
+
+    domain = 'lambda'
+    anti_domain_1 =  'PcollWiFi'
+
+    sim1_1_label = "5G-Coex-SimPy: K=2"
+    sim1_2_label = "5G-Coex-SimPy: K=4"
+    sim1_3_label = "5G-Coex-SimPy: K=6"
+    sim1_4_label = "5G-Coex-SimPy: K=8"
+    sim1_5_label = "5G-Coex-SimPy: K=10"
+    sim1_6_label = "5G-Coex-SimPy: K=20"
+    sim1_7_label = "5G-Coex-SimPy: K=1000"
+
+    # Simulation results parameters
+    sim1 = pd.read_csv('csvresults/VAL/buffer/buffer-v2.csv', delimiter=',')
+
+    OX_description = "Lambda"
+    OY_description = "Collision probability"
+    result_file = 'results/VAL/buffer/buffer-2.svg'
+
+    # t-student parameter for confidence intervals
+    alfa = 0.05
+
+    # Calculating standard deviation
+    sim1_1_std = sim1[sim1['buffer'] == 2].groupby([domain]).std().loc[:,anti_domain_1]
+    sim1_2_std = sim1[sim1['buffer'] == 4].groupby([domain]).std().loc[:,anti_domain_1]
+    sim1_3_std = sim1[sim1['buffer'] == 6].groupby([domain]).std().loc[:,anti_domain_1]
+    sim1_4_std = sim1[sim1['buffer'] == 8].groupby([domain]).std().loc[:,anti_domain_1]
+    sim1_5_std = sim1[sim1['buffer'] == 10].groupby([domain]).std().loc[:,anti_domain_1]
+    sim1_6_std = sim1[sim1['buffer'] == 20].groupby([domain]).std().loc[:,anti_domain_1]
+    sim1_7_std = sim1[sim1['buffer'] == 1000].groupby([domain]).std().loc[:,anti_domain_1]
+
+    # Calculating number of probes
+    sim1_1_n = sim1[sim1['buffer'] == 2].groupby([domain]).count().loc[:,anti_domain_1]
+    sim1_2_n = sim1[sim1['buffer'] == 4].groupby([domain]).count().loc[:,anti_domain_1]
+    sim1_3_n = sim1[sim1['buffer'] == 6].groupby([domain]).count().loc[:, anti_domain_1]
+    sim1_4_n = sim1[sim1['buffer'] == 8].groupby([domain]).count().loc[:, anti_domain_1]
+    sim1_5_n = sim1[sim1['buffer'] == 10].groupby([domain]).count().loc[:, anti_domain_1]
+    sim1_6_n = sim1[sim1['buffer'] == 20].groupby([domain]).count().loc[:, anti_domain_1]
+    sim1_7_n = sim1[sim1['buffer'] == 1000].groupby([domain]).count().loc[:, anti_domain_1]
+
+    # Calculating error for each probe
+    sim1_1_err = sim1_1_std / np.sqrt(sim1_1_n) * t.ppf(1 - alfa / 2, sim1_1_n - 1)
+    sim1_2_err = sim1_2_std / np.sqrt(sim1_2_n) * t.ppf(1 - alfa / 2, sim1_2_n - 1)
+    sim1_3_err = sim1_3_std / np.sqrt(sim1_3_n) * t.ppf(1 - alfa / 2, sim1_3_n - 1)
+    sim1_4_err = sim1_4_std / np.sqrt(sim1_4_n) * t.ppf(1 - alfa / 2, sim1_4_n - 1)
+    sim1_5_err = sim1_5_std / np.sqrt(sim1_5_n) * t.ppf(1 - alfa / 2, sim1_5_n - 1)
+    sim1_6_err = sim1_6_std / np.sqrt(sim1_6_n) * t.ppf(1 - alfa / 2, sim1_6_n - 1)
+    sim1_7_err = sim1_7_std / np.sqrt(sim1_7_n) * t.ppf(1 - alfa / 2, sim1_7_n - 1)
+
+    # Results grouping
+    sim1_1 = sim1[sim1['buffer'] == 2].groupby([domain])[anti_domain_1].mean()
+    sim1_2 = sim1[sim1['buffer'] == 4].groupby([domain])[anti_domain_1].mean()
+    sim1_3 = sim1[sim1['buffer'] == 6].groupby([domain])[anti_domain_1].mean()
+    sim1_4 = sim1[sim1['buffer'] == 8].groupby([domain])[anti_domain_1].mean()
+    sim1_5 = sim1[sim1['buffer'] == 10].groupby([domain])[anti_domain_1].mean()
+    sim1_6 = sim1[sim1['buffer'] == 20].groupby([domain])[anti_domain_1].mean()
+    sim1_7 = sim1[sim1['buffer'] == 1000].groupby([domain])[anti_domain_1].mean()
+
+    # Results plotting
+    ax1 = sim1_1.plot(marker='o', legend=True, mfc='none',yerr=sim1_1_err,capsize=4)
+    ax2 = sim1_2.plot(ax=ax1, marker='o', legend=True,yerr=sim1_2_err,capsize=4 )
+    ax3 = sim1_3.plot(ax=ax2, marker='o', legend=True , mfc='none',yerr=sim1_3_err,capsize=4)
+    ax4 = sim1_4.plot(ax=ax3, marker='o', legend=True,yerr=sim1_4_err,capsize=4)
+    ax5 = sim1_5.plot(ax=ax4,marker='o', legend=True, mfc='none', yerr=sim1_5_err, capsize=4)
+    ax6 = sim1_6.plot(ax=ax5, marker='o', legend=True, yerr=sim1_6_err, capsize=4)
+    ax7 = sim1_7.plot(ax=ax6, marker='o',ylim=(0, 0.4), legend=True, mfc='none', yerr=sim1_7_err, capsize=4)
+
+    # log scale option
+    #ax4.set_xscale('log')
+
+    ax7.legend([sim1_1_label, sim1_2_label, sim1_3_label, sim1_4_label,sim1_5_label, sim1_6_label, sim1_7_label])
+    ax7.set_xlabel(OX_description, fontsize=14)
+    ax7.set_ylabel(OY_description, fontsize=14)
+
+    plt.tight_layout()
+    plt.savefig(result_file)
+
+
 
 if __name__ == "__main__":
-    print_four_simulations()
+    #print_four_simulations()
     #valid_single_simulation()
     #valid_four_simulations()
     #valid_two_simulations()
-
+    print_buffer_simulations()
 
 
 

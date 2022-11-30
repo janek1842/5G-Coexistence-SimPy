@@ -17,7 +17,8 @@ def single_run(
         RTS_threshold,
         wifi_standard,
         nAMPDUs,
-        nSS
+        nSS,
+        buffer_size,
 ):
 
     backoffs = {key: {sum(stations_number.values()): 0} for key in range(cw_max + 1)}
@@ -43,7 +44,7 @@ def single_run(
                    Config(data_size=payload_size, cw_min=cw_min, cw_max=cw_max, r_limit=r_limit, mcs=mcs_value),
                    Config_NR(deter_period=16, observation_slot_duration=9, synchronization_slot_duration=sync,
                              max_sync_slot_desync=1000, min_sync_slot_desync=0, M=3, cw_min=cw_min, cw_max=cw_max,retry_limit=r_limit,mcot=6),
-                   backoffs, airtime_data, airtime_control, airtime_data_NR, airtime_control_NR,poisson_lambda,transtime=transtime,Queue=Queue,distribution_k=distribution_k,RTS_threshold=RTS_threshold,wifi_standard=wifi_standard,nMPDU=nAMPDUs,nSS=nSS)
+                   backoffs, airtime_data, airtime_control, airtime_data_NR, airtime_control_NR,poisson_lambda,transtime=transtime,Queue=Queue,distribution_k=distribution_k,RTS_threshold=RTS_threshold,wifi_standard=wifi_standard,nMPDU=nAMPDUs,nSS=nSS,buffer_size=buffer_size)
 
 if __name__ == "__main__":
 
@@ -58,31 +59,32 @@ if __name__ == "__main__":
     # 9, 18, 36, 63, 125, 250, 500, or 1000 μs
     # 0.001,0.002,0.003,0.004,0.005,0.006,0.007,0.008,0.009,0.01,0.012,0.014
     for var in list:
-        for k in [300,600,900,1200,1500,1800]:
+        for k in [0.1,0.2,0.3,0.4,0.5,0.6,0.7,0.8,0.9,1]:
 
             stationsConfig = {
-                "backgroundStations": 4,
-                "bestEffortStations": 4,
-                "videoStations": 4,
-                "voiceStations": 4
+                "backgroundStations": 0,
+                "bestEffortStations": 8,
+                "videoStations": 0,
+                "voiceStations": 0
             }
-
-            single_run(seeds=var,
-                       stations_number=stationsConfig,
-                       gnb_number=0,
-                       simulation_time=10,
-                       payload_size=k,
-                       cw_min=15,
-                       cw_max=1023,
-                       r_limit=7,
-                       mcs_value=7,
-                       poisson_lambda=0.3,
-                       sync=0,
-                       transtime=0,
-                       distribution_k = 1,
-                       RTS_threshold = 9000000,
-                       wifi_standard = "802.11a", # 802.11ac or 802.11a
-                       nAMPDUs = 1,
-                       nSS = 1
-                       )
+            for d in [2,4,6,8,10,20,1000]:
+                single_run(seeds=var,
+                           stations_number=stationsConfig,
+                           gnb_number=0,
+                           simulation_time=10,
+                           payload_size=1800,
+                           cw_min=15,
+                           cw_max=1023,
+                           r_limit=3,
+                           mcs_value=7,
+                           poisson_lambda=k,
+                           sync=0,
+                           transtime=6000,
+                           distribution_k = 1,
+                           RTS_threshold = 9000000000,
+                           wifi_standard = "802.11a", # 802.11ac or 802.11a
+                           nAMPDUs = 1,
+                           nSS = 1,
+                           buffer_size = d
+                           )
 
