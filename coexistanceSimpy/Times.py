@@ -103,7 +103,6 @@ class Times:
         return math.ceil(ack_tx_time)
         #return 28+16
 
-
     def get_rts_cts_time(self):
         return 2 * Times.t_sifs + (14 * 8 / self.ctr_rate) + Times.t_difs + (20 * 8 / self.ctr_rate)
 

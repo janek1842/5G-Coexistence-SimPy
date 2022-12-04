@@ -16,7 +16,7 @@ from scipy.stats import erlang,pareto,exponnorm,lognorm,triang
 from .Times import *
 from datetime import datetime
 
-output_csv = "csvresults/VAL/buffer/buffer-v2.csv"
+output_csv = "csvresults/VAL/edca-buffer/buffer-v1.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
 
 typ_filename = "RS_coex_1sta_1wifi2.log"
@@ -136,7 +136,7 @@ class Station:
 
     def start_generating(self):
         self.sumTime = numpy.random.exponential(1 / self.poisson_lambda) * 1000
-        if len(self.Queue[self.name]) <= self.buffer_size:
+        if self.buffer_size is None or len(self.Queue[self.name]) <= self.buffer_size:
             self.Queue[self.name].append(1)
             self.frame_to_send = self.generate_new_frame()
 
@@ -407,7 +407,7 @@ class Gnb:
 
     def start_generating(self):
         self.sumTime = numpy.random.exponential(1 / self.poisson_lambda) * 1000
-        if len(self.Queue[self.name]) < self.buffer_size:
+        if self.buffer_size is None or len(self.Queue[self.name]) <= self.buffer_size:
             self.Queue[self.name].append(1)
             self.transmission_to_send=self.gen_new_transmission()
         self.env.process(self.wait_for_frame())
