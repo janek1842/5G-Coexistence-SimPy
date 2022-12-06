@@ -1,0 +1,6 @@
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Jan Ściga"
+title: "5G-Coex-SimPy"
+date-released: 2022-12-04
+url: "https://github.com/janek1842/5G-Coexistence-SimPy"
