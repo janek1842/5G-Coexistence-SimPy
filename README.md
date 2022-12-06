@@ -18,7 +18,7 @@ In order to properly run 5G-Coex-SimPy, an IDE (like PyCharm) is needed to smoot
 
 - *client_coex.py* - configuring and running simmulations
 - *Coexistence.py* and *Times.py* - simulation logic 
-- *result_analysis.py* - results processing and visualization 
+- *resultAnalysis.py* - results processing and visualization 
 
 
 
