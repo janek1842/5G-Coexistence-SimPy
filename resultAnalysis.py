@@ -67,21 +67,21 @@ def valid_two_simulations():
     viridis(0.0, 1.0, 4)
 
     # Simulation results parameters
-    domain = 'WiFi'
-    anti_domain = 'Throughput'
+    domain = 'cw_min'
+    anti_domain = 'ChannelOccupancyNR'
 
-    sim1_label = "5G-Coex-SimPy: RTS/CTS ON"
-    sim2_label = "5G-Coex-SimPy: RTS/CTS OFF"
+    sim1_label = "MATLAB: NR-U"
+    sim2_label = "5G-Coex-SimPy: NR-U"
 
-    sim1 = pd.read_csv('csvresults/VAL/RTS/st2/st2-v2-on.csv', delimiter=',')
-    sim2 = pd.read_csv('csvresults/VAL/RTS/st2/st2-v2-off.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/VAL/NRu-gap/cw/sp-cw-v1.csv', delimiter=',')
+    sim2 = pd.read_csv('csvresults/VAL/NRu-gap/cw/matlab-cw-v1.csv', delimiter=',')
 
-    x_axis_description = "Total number of stations"
-    y_axis_description = "Throughput [Mb/s]"
+    x_axis_description = "CWmin"
+    y_axis_description = "Channel occupancy"
     linestyle="solid"
 
-    y_range = (0,50)
-    result_file_path = 'results/VAL/RTS/st2/sp-st2-v2.svg'
+    y_range = (0,1)
+    result_file_path = 'results/VAL/WiFi/stations/cot/cot-stations-v10.svg'
 
     # t-student parameter for confidence intervals
     alfa = 0.05
@@ -110,7 +110,7 @@ def valid_two_simulations():
     sim2_plot.xaxis.set_major_locator(MaxNLocator(integer=True))
 
     # log scale
-    #sim1_plot.set_xscale('log')
+    sim1_plot.set_xscale('log')
 
     sim2_plot.legend([sim1_label,sim2_label])
     sim2_plot.set_xlabel(x_axis_description, fontsize=14)

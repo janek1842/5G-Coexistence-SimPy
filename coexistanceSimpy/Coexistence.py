@@ -16,7 +16,7 @@ from scipy.stats import erlang,pareto,exponnorm,lognorm,triang
 from .Times import *
 from datetime import datetime
 
-output_csv = "csvresults/VAL/edca-buffer/buffer-v1.csv"
+output_csv = "csvresults/VAL/edca-buffer/buffer-vx.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
 
 typ_filename = "RS_coex_1sta_1wifi2.log"

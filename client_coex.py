@@ -59,32 +59,32 @@ if __name__ == "__main__":
     # 9, 18, 36, 63, 125, 250, 500, or 1000 μs
     # 0.001,0.002,0.003,0.004,0.005,0.006,0.007,0.008,0.009,0.01,0.012,0.014
     for var in list:
-        for k in [2,0.04,0.06,0.08,0.1,0.12,0.14,0.16,0.18,0.2]:
+        for k in [1,2,3,4,5,6,7,8,9,10,11,12,12,14,15,16]:
 
             stationsConfig = {
                 "backgroundStations": 0,
-                "bestEffortStations": 0,
+                "bestEffortStations": k,
                 "videoStations": 0,
                 "voiceStations": 0
             }
-            for d in [2,8,1000]:
-                    single_run(seeds=var,
-                               stations_number=stationsConfig,
-                               gnb_number=4,
-                               simulation_time=10,
-                               payload_size=1500,
-                               cw_min=15,
-                               cw_max=1023,
-                               r_limit=7,
-                               mcs_value=7,
-                               poisson_lambda=k,
-                               sync=1000,
-                               transtime=6000,
-                               distribution_k = 1,
-                               RTS_threshold = 9000000000,
-                               wifi_standard = "802.11a", # 802.11ac or 802.11a
-                               nAMPDUs = 1,
-                               nSS = 1,
-                               buffer_size = d
-                               )
+
+            single_run(seeds=var,
+                       stations_number=stationsConfig,
+                       gnb_number=0,
+                       simulation_time=10,
+                       payload_size=1500,
+                       cw_min=15,
+                       cw_max=1023,
+                       r_limit=7,
+                       mcs_value=7,
+                       poisson_lambda=None,
+                       sync=1000,
+                       transtime=6000,
+                       distribution_k = 1,
+                       RTS_threshold = 9000000000,
+                       wifi_standard = "802.11a", # 802.11ac or 802.11a
+                       nAMPDUs = 1,
+                       nSS = 1,
+                       buffer_size = 100
+                       )
 
