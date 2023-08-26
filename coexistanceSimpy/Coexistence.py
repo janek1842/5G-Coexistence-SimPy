@@ -16,7 +16,7 @@ from scipy.stats import erlang,pareto,exponnorm,lognorm,triang
 from .Times import *
 from datetime import datetime
 
-output_csv = "csvresults/VAL/edca-buffer/buffer-vx.csv"
+output_csv = "csvresults/V3/test12.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
 
 typ_filename = "RS_coex_1sta_1wifi2.log"
@@ -306,8 +306,8 @@ class Station:
         return back_off * self.times.t_slot
 
     def generate_new_frame(self):
-        frame_length = self.times.get_ppdu_frame_time(self.config.nAMPDU)
-        #frame_length = self.transtime
+        #frame_length = self.times.get_ppdu_frame_time(self.config.nAMPDU)
+        frame_length = self.transtime
         return Frame(frame_length, self.name, self.col, self.config.data_size, self.env.now)
 
     def sent_failed(self):
@@ -379,10 +379,12 @@ class Gnb:
         self.succeeded_transmissions = 0  # all succeeded transmissions for station
         self.failed_transmissions = 0  # all failed transmissions for station
         self.failed_transmissions_in_row = 0  # all failed transmissions for station in a row
+
         self.cw_min = config_nr.cw_min  # cw min parameter value
         self.N = None  # backoff counter
         self.desync = 0
         self.next_sync_slot_boundry = 0
+
         self.cw_max = config_nr.cw_max  # cw max parameter value
         self.channel = channel  # channel objfirst_transmission
         env.process(self.start())  # starting simulation process
@@ -651,6 +653,7 @@ class Gnb:
                 return True
 
     def gen_new_transmission(self):
+
         #transmission_time = self.config_nr.mcot * 1000  # transforming to usec
         transmission_time = self.transtime
         if gap:
@@ -668,6 +671,7 @@ class Gnb:
         upper_limit = (
             upper_limit if upper_limit <= self.cw_max else self.cw_max)  # set upper limit to CW Max if is bigger then this parameter
         back_off = random.randint(0, upper_limit)  # draw the back off value
+        #print(self)
         self.backoffs[back_off][1] += 1  # store drawn value for future analyzes
         return back_off * self.config_nr.observation_slot_duration
 
@@ -691,6 +695,16 @@ class Gnb:
         self.channel.succeeded_transmissions_NR += 1
         self.succeeded_transmissions += 1
         self.failed_transmissions_in_row = 0
+
+        if self.config_nr.cw_min == 15 and self.config_nr.cw_max == 1023 and self.config_nr.M==8:
+            self.channel.succeeded_transmissions_c1 += 1
+        elif self.config_nr.cw_min == 15 and self.config_nr.cw_max == 63 and self.config_nr.M==8:
+            self.channel.succeeded_transmissions_c2 += 1
+        elif self.config_nr.cw_min == 7 and self.config_nr.cw_max == 15 and self.config_nr.M==3:
+            self.channel.succeeded_transmissions_c3 += 1
+        else:
+            self.channel.succeeded_transmissions_c4 += 1
+
         return True
 
 @dataclass()
@@ -714,10 +728,17 @@ class Channel:
     failed_transmissions: int = 0  # total failed transmissions
     succeeded_transmissions: int = 0  # total succeeded transmissions
 
+    # Stats for individual categories
+
     succeeded_transmissions_be: int = 0
     succeeded_transmissions_bg: int = 0
     succeeded_transmissions_vc: int = 0
     succeeded_transmissions_vd: int = 0
+
+    succeeded_transmissions_c1: int = 0
+    succeeded_transmissions_c2: int = 0
+    succeeded_transmissions_c3: int = 0
+    succeeded_transmissions_c4: int = 0
 
     rts_list: List[Station] = field(default_factory=list)
     succeeded_rts: int = 0
@@ -760,7 +781,7 @@ class Transmission_NR:
     collided: bool = False  # true if transmission colided with another one
 
 
-def getTimeCategories(number_of_stations,airtime_data,trafficType):
+def getWifiTimeCategories(number_of_stations,airtime_data,trafficType):
     airtime_values=list(airtime_data.values())
 
     if trafficType == "background":
@@ -769,13 +790,26 @@ def getTimeCategories(number_of_stations,airtime_data,trafficType):
         return sum(airtime_values[number_of_stations["backgroundStations"]:number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]])
     elif  trafficType == "video":
         return sum(airtime_values[number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]:number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+number_of_stations["videoStations"]])
-    else:
+    elif trafficType == "voice":
         return sum(airtime_values[number_of_stations["backgroundStations"] + number_of_stations["bestEffortStations"] +
-                   number_of_stations["videoStations"]:])
+                   number_of_stations["videoStations"]:number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+number_of_stations["videoStations"]+number_of_stations["voiceStations"]])
+
+def getNruTimeCategories(number_of_stations,airtime_data,trafficType):
+    airtime_values=list(airtime_data.values())
+
+    if trafficType == "class_1":
+        return sum(airtime_values[0:number_of_stations["class_1"]])
+    elif  trafficType == "class_2":
+        return sum(airtime_values[number_of_stations["class_1"]:number_of_stations["class_1"]+number_of_stations["class_2"]])
+    elif  trafficType == "class_3":
+        return sum(airtime_values[number_of_stations["class_1"]+number_of_stations["class_2"]:number_of_stations["class_1"]+number_of_stations["class_2"]+number_of_stations["class_3"]])
+    elif trafficType == "class_4":
+        return sum(airtime_values[number_of_stations["class_1"]+number_of_stations["class_2"]+number_of_stations["class_3"]:number_of_stations["class_1"]+number_of_stations["class_2"]+number_of_stations["class_3"]+number_of_stations["class_4"]])
+
 
 def run_simulation(
         number_of_stations: Dict[str,int],
-        number_of_gnb: int,
+        number_of_gnb: Dict[str,int],
         seed: int,
         simulation_time: int,
         config: Config,
@@ -802,7 +836,7 @@ def run_simulation(
         simpy.Resource(environment, capacity=1),
         simpy.Resource(environment, capacity=1),
         sum(number_of_stations.values()),
-        number_of_gnb,
+        sum(number_of_gnb.values()),
         backoffs,
         airtime_data,
         airtime_control,
@@ -817,7 +851,7 @@ def run_simulation(
     nAMPDU  = nMPDU
     nSS = nSS
 
-    # EDCA categories
+    # EDCA categories handling
     for i in range(1, sum(number_of_stations.values()) + 1):
         # 1st group - Background
         if i in range (1,number_of_stations["backgroundStations"]+1):
@@ -836,8 +870,44 @@ def run_simulation(
             config_local = Config(config.data_size, 3,7, config.r_limit, config.mcs, 2,RTS_threshold,standard,nAMPDU,nSS)
             Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(7 + 1)},Queue=Queue,buffer_size=buffer_size)
 
-    for i in range(1, number_of_gnb + 1):
-        Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr,transtime=transtime,backoffs = {key: {1: 0} for key in range(1023 + 1)},poisson_lambda=poisson_lambda,Queue=Queue,buffer_size=buffer_size)
+    # NR-U categories handling
+    for i in range(1, sum(number_of_gnb.values()) + 1):
+
+        # 1st group - Class 1
+        if i in range (1,number_of_gnb["class_1"]+1):
+            config_nr_local = Config_NR(deter_period=config_nr.deter_period, observation_slot_duration=config_nr.synchronization_slot_duration,
+                                        synchronization_slot_duration=config_nr.synchronization_slot_duration,max_sync_slot_desync=config_nr.max_sync_slot_desync,
+                                        min_sync_slot_desync=config_nr.min_sync_slot_desync, M=7, cw_min=15, cw_max=1023,retry_limit=config_nr.retry_limit,
+                                        mcot=8)
+            Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr_local, transtime=transtime,backoffs={key: {1: 0} for key in range(1023 + 1)}, poisson_lambda=poisson_lambda, Queue=Queue,buffer_size=buffer_size)
+
+        # 2nd group - Class 2
+        elif i in range (number_of_gnb["class_1"]+1,number_of_gnb["class_1"]+number_of_gnb["class_2"]+1):
+            config_nr_local = Config_NR(deter_period=config_nr.deter_period, observation_slot_duration=config_nr.synchronization_slot_duration,
+                                        synchronization_slot_duration=config_nr.synchronization_slot_duration, max_sync_slot_desync=config_nr.max_sync_slot_desync,
+                                        min_sync_slot_desync=config_nr.min_sync_slot_desync, M=3, cw_min=15, cw_max=63, retry_limit=config_nr.retry_limit,
+                                        mcot=3)
+            Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr_local, transtime=transtime,backoffs={key: {1: 0} for key in range(63 + 1)}, poisson_lambda=poisson_lambda, Queue=Queue,buffer_size=buffer_size)
+
+        # 3rd group - Class 3
+        elif i in range (number_of_gnb["class_1"]+number_of_gnb["class_2"]+1,number_of_gnb["class_1"]+number_of_gnb["class_2"]+number_of_gnb["class_3"]+1):
+            config_nr_local = Config_NR(deter_period=config_nr.deter_period, observation_slot_duration=config_nr.synchronization_slot_duration,
+                                        synchronization_slot_duration=config_nr.synchronization_slot_duration, max_sync_slot_desync=config_nr.max_sync_slot_desync,
+                                        min_sync_slot_desync=config_nr.min_sync_slot_desync, M=1, cw_min=7, cw_max=15, retry_limit=config_nr.retry_limit,
+                                        mcot=3)
+            Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr_local, transtime=transtime,backoffs={key: {1: 0} for key in range(15 + 1)}, poisson_lambda=poisson_lambda, Queue=Queue,buffer_size=buffer_size)
+
+        # 4th group - Class 4
+        else:
+            config_nr_local = Config_NR(deter_period=config_nr.deter_period, observation_slot_duration=config_nr.synchronization_slot_duration,
+                                        synchronization_slot_duration=config_nr.synchronization_slot_duration, max_sync_slot_desync=config_nr.max_sync_slot_desync,
+                                        min_sync_slot_desync=config_nr.min_sync_slot_desync, M=1, cw_min=3, cw_max=7, retry_limit=config_nr.retry_limit,
+                                        mcot=2)
+            Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr_local, transtime=transtime,backoffs={key: {1: 0} for key in range(7 + 1)}, poisson_lambda=poisson_lambda, Queue=Queue,buffer_size=buffer_size)
+
+
+    # for i in range(1, number_of_gnb + 1):
+    #     Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr,transtime=transtime,backoffs = {key: {1: 0} for key in range(1023 + 1)},poisson_lambda=poisson_lambda,Queue=Queue,buffer_size=buffer_size)
 
     environment.run(until=simulation_time * 1000000)
 
@@ -850,7 +920,7 @@ def run_simulation(
     else:
         p_coll = 0
 
-    if number_of_gnb != 0:
+    if sum(number_of_gnb.values()) != 0:
         if (channel.failed_transmissions_NR + channel.succeeded_transmissions_NR) != 0:
             p_coll_NR = "{:.4f}".format(
                 channel.failed_transmissions_NR / (channel.failed_transmissions_NR + channel.succeeded_transmissions_NR))
@@ -869,7 +939,7 @@ def run_simulation(
         channel_occupancy_time += channel.airtime_data["Station {}".format(i)] + channel.airtime_control["Station {}".format(i)]
         channel_efficiency += channel.airtime_data["Station {}".format(i)]
 
-    for i in range(1, number_of_gnb + 1):
+    for i in range(1, sum(number_of_gnb.values()) + 1):
         channel_occupancy_time_NR += channel.airtime_data_NR["Gnb {}".format(i)] + channel.airtime_control_NR["Gnb {}".format(i)]
         channel_efficiency_NR += channel.airtime_data_NR["Gnb {}".format(i)]
 
@@ -889,25 +959,38 @@ def run_simulation(
     thrpt_be = (channel.succeeded_transmissions_be * config.data_size * 8) / (simulation_time * 1000000)
     thrpt_bg = (channel.succeeded_transmissions_bg * config.data_size * 8) / (simulation_time * 1000000)
 
+    thrpt_c1 = (channel.succeeded_transmissions_c1 *8) / (simulation_time * 1000000)
+    thrpt_c2 = (channel.succeeded_transmissions_c2 *8) / (simulation_time * 1000000)
+    thrpt_c3 = (channel.succeeded_transmissions_c3 *8) / (simulation_time * 1000000)
+    thrpt_c4 = (channel.succeeded_transmissions_c4 *8) / (simulation_time * 1000000)
+
+    print("")
     print("------------------------------------------------------------------------------------------")
     print(" T_VC: ", thrpt_vc, " T_VD: ",thrpt_vd, " T_BE: ",thrpt_be, " T_BG: ",thrpt_bg)
+    print(" T_C1: ", thrpt_c1, " T_C2: ", thrpt_c2, " T_C3: ", thrpt_c3, " T_C4: ", thrpt_c4)
 
     jain_dict = airtime_data
     jain_dict.update(airtime_data_NR)
     try:
-        jain_fair_index= pow(sum(jain_dict.values()),2) / ( (number_of_gnb + sum(number_of_stations.values()) ) * sum({k: pow(v,2) for k,v in jain_dict.items() }.values()))
+        jain_fair_index= pow(sum(jain_dict.values()),2) / ( (sum(number_of_gnb.values()) + sum(number_of_stations.values()) ) * sum({k: pow(v,2) for k,v in jain_dict.items() }.values()))
     except:
         jain_fair_index = 0
 
-    beAirTime = getTimeCategories(number_of_stations,airtime_data,"bestEffort") / (simulation_time * 1000000)
-    vdAirTime = getTimeCategories(number_of_stations,airtime_data,"video") / (simulation_time * 1000000)
-    vcAirTime = getTimeCategories(number_of_stations,airtime_data,"voice") / (simulation_time * 1000000)
-    bgAirTime = getTimeCategories(number_of_stations,airtime_data,"background") / (simulation_time * 1000000)
+    beAirTime = getWifiTimeCategories(number_of_stations,airtime_data,"bestEffort") / (simulation_time * 1000000)
+    vdAirTime = getWifiTimeCategories(number_of_stations,airtime_data,"video") / (simulation_time * 1000000)
+    vcAirTime = getWifiTimeCategories(number_of_stations,airtime_data,"voice") / (simulation_time * 1000000)
+    bgAirTime = getWifiTimeCategories(number_of_stations,airtime_data,"background") / (simulation_time * 1000000)
+
+    c1AirTime = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_1") / (simulation_time * 1000000)
+    c2AirTime = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_2") / (simulation_time * 1000000)
+    c3AirTime = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_3") / (simulation_time * 1000000)
+    c4AirTime = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_4") / (simulation_time * 1000000)
 
     print(" BE: ",beAirTime," BG: ",bgAirTime," VD: ",vdAirTime," VC: ",vcAirTime)
+    print(" C1: ", c1AirTime, "C2: ", c2AirTime, "C3: ", c3AirTime, "C4: ", c4AirTime)
 
     print(
-        f"SEED = {seed} N_stations:={sum(number_of_stations.values())} N_gNB:={number_of_gnb}  CW_MIN = {config.cw_min} CW_MAX = {config.cw_max} "
+        f"SEED = {seed} N_stations:={sum(number_of_stations.values())} N_gNB:={sum(number_of_gnb.values())}  CW_MIN = {config.cw_min} CW_MAX = {config.cw_max} "
         f"WiFi pcol:={p_coll} WiFi cot:={normalized_channel_occupancy_time} WiFi eff:={normalized_channel_efficiency} "
         f"gNB pcol:={p_coll_NR} gNB cot:={normalized_channel_occupancy_time_NR} gNB eff:={normalized_channel_efficiency_NR} "
         f" all cot:={normalized_channel_occupancy_time_all} all eff:={normalized_channel_efficiency_all}"
@@ -923,8 +1006,12 @@ def run_simulation(
     print("MCS: ",config.mcs)
     print("nAMPDU: ", nAMPDU)
     print("nSS: ", nSS)
-    # print(channel.failed_rts/(channel.failed_rts+channel.succeeded_rts))
+    print("buffer: ", buffer_size)
     print("------------------------------------------------------------------------------------------")
+    print("")
+
+
+    # SAVING RESULTS TO THE CSV
 
     write_header = True
     if os.path.isfile(output_csv):
@@ -932,17 +1019,20 @@ def run_simulation(
     with open(output_csv, mode='a', newline="") as result_file:
         result_adder = csv.writer(result_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         firstliner='Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcollWiFi,ChannelOccupancyNR,ChannelEfficiencyNR,PcollNR,ChannelOccupancyAll,ChannelEfficiencyAll,' \
-                   'Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,cw_min,mcs,retryLimit,sync,lenLte,distribution_k,nMPDU,nss,buffer'
+                   'Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,cw_min,mcs,retryLimit,sync,lenLte,distribution_k,nMPDU,nss,buffer,c1AirTime,c2AirTime,c3AirTime,c4AirTime,thrpt_c1,thrpt_c2,thrpt_c3,thrpt_c4'
 
         if write_header:
             result_adder.writerow([firstliner.strip('"')])
 
         result_adder.writerow(
-            [seed, sum(number_of_stations.values()), number_of_gnb, normalized_channel_occupancy_time, normalized_channel_efficiency,
+            [seed, sum(number_of_stations.values()), sum(number_of_gnb.values()), normalized_channel_occupancy_time, normalized_channel_efficiency,
              p_coll,
              normalized_channel_occupancy_time_NR, normalized_channel_efficiency_NR, p_coll_NR,
-             normalized_channel_occupancy_time_all, normalized_channel_efficiency_all,throughput,config.data_size,simulation_time,jain_fair_index,beAirTime,vdAirTime,vcAirTime,bgAirTime,poisson_lambda,
-             thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,config.cw_min,config.mcs,config.r_limit,config_nr.synchronization_slot_duration,transtime,distribution_k,nMPDU,nSS,buffer_size])
+             normalized_channel_occupancy_time_all, normalized_channel_efficiency_all,throughput,
+             config.data_size,simulation_time,jain_fair_index,beAirTime,vdAirTime,vcAirTime,bgAirTime,poisson_lambda,
+             thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,config.cw_min,config.mcs,config.r_limit,config_nr.synchronization_slot_duration,
+             transtime,distribution_k,nMPDU,nSS,buffer_size,c1AirTime,c2AirTime,c3AirTime,
+             c4AirTime,thrpt_c1,thrpt_c2,thrpt_c3,thrpt_c4])
 
 
 
