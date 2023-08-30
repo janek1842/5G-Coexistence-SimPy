@@ -60,42 +60,41 @@ if __name__ == "__main__":
     # sync values: 9, 18, 36, 63, 125, 250, 500, or 1000 μs
 
     for var in list:
-        for k in [0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1]:
+        for i in [0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1,0.12,0.14]:
 
             # WiFi EDCA categories
             stationsConfig = {
-                "backgroundStations": 1,
+                "backgroundStations": 0,
                 "bestEffortStations": 1,
-                "videoStations": 1,
-                "voiceStations": 1
+                "videoStations": 0,
+                "voiceStations": 0
             }
 
             # NR-U categories
             gNBsConfig = {
-                "class_1": 1,
-                "class_2": 1,
-                "class_3": 1,
+                "class_1": 0,
+                "class_2": 0,
+                "class_3": 0,
                 "class_4": 1
             }
-            
-            # for i in [1,10000,1000000]:
+
+            # for j in [1,10,20,30]:
             single_run(seeds=var,
                        stations_number=stationsConfig,
                        gnb_number=gNBsConfig,
-                       simulation_time=5,
+                       simulation_time=10,
                        payload_size=1500,
                        cw_min=15,
                        cw_max=1023,
                        r_limit=7,
                        mcs_value=7,
-                       poisson_lambda=k,
-                       sync=500,
+                       poisson_lambda=i,
+                       sync=125,
                        transtime=5000,
                        distribution_k = 1,
                        RTS_threshold = 9000000000,
                        wifi_standard = "802.11a", # 802.11ac or 802.11a
                        nAMPDUs = 1,
                        nSS = 1,
-                       buffer_size = 100000
+                       buffer_size = 3000
                        )
-

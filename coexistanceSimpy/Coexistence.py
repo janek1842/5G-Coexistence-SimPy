@@ -15,8 +15,9 @@ from scipy.stats import erlang,pareto,exponnorm,lognorm,triang
 #from numpy.random import pareto
 from .Times import *
 from datetime import datetime
+from collections import defaultdict
 
-output_csv = "csvresults/V3/test12.csv"
+output_csv = "csvresults/V4/latency/test5.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
 
 typ_filename = "RS_coex_1sta_1wifi2.log"
@@ -128,7 +129,7 @@ class Station:
         self.sumTime =0
         self.simulation_time = simulation_time
         self.Queue = Queue
-        self.buffer_size = buffer_size
+        self.buffer_size = buffer_size/3000
 
     def wait_for_frame(self,time_to_wait):
         yield self.env.timeout(time_to_wait)
@@ -137,8 +138,8 @@ class Station:
     def start_generating(self):
         self.sumTime = numpy.random.exponential(1 / self.poisson_lambda) * 1000
         if self.buffer_size is None or len(self.Queue[self.name]) <= self.buffer_size:
-            self.Queue[self.name].append(1)
-            self.frame_to_send = self.generate_new_frame()
+            self.Queue[self.name].append(self.generate_new_frame())
+            #self.frame_to_send = self.generate_new_frame()
 
         self.env.process(self.wait_for_frame(self.sumTime))
 
@@ -150,10 +151,11 @@ class Station:
         while True:
             if len(self.Queue[self.name]) > 0 or self.poisson_lambda is None:
                 if self.poisson_lambda is not None:
+                    self.frame_to_send = self.Queue[self.name][0]
                     self.Queue[self.name].pop(0)
+                    self.was_sent = False
                     pass
-                self.frame_to_send = self.generate_new_frame()
-                self.was_sent = False
+
                 while not self.was_sent:
                     if self.frame_to_send is not None:
                             self.process = self.env.process(self.wait_back_off())
@@ -316,11 +318,22 @@ class Station:
         self.channel.failed_transmissions += 1
         self.failed_transmissions += 1
         self.failed_transmissions_in_row += 1
+
         log(self, self.channel.failed_transmissions)
 
         if self.frame_to_send.number_of_retransmissions > self.config.r_limit:
             self.frame_to_send = self.generate_new_frame()
             self.failed_transmissions_in_row = 0
+
+    def getTypeFromStation(self):
+        if self.config.cw_min == 15 and self.config.cw_max == 1023 and self.config.aifsn == 7:
+            return "bg"
+        elif self.config.cw_min == 15 and self.config.cw_max == 1023 and self.config.aifsn == 3:
+            return "be"
+        elif self.config.cw_min == 7 and self.config.cw_max == 15 and self.config.aifsn == 2:
+            return "vd"
+        elif self.config.cw_min == 3 and self.config.cw_max == 7 and self.config.aifsn == 2:
+            return "vo"
 
     def packet_dropped(self):
         log(self, "Frame dropped")
@@ -337,16 +350,23 @@ class Station:
         log(self, f"Successfully sent frame, waiting ack: {self.times.get_ack_frame_time()}")
         self.frame_to_send.t_end = self.env.now
         self.frame_to_send.t_to_send = (self.frame_to_send.t_end - self.frame_to_send.t_start)
+
+        self.channel.latency_wifi.append(self.frame_to_send.t_to_send)
+
         self.channel.succeeded_transmissions += 1
 
         if self.config.cw_min == 15 and self.config.cw_max == 1023 and self.config.aifsn==7:
             self.channel.succeeded_transmissions_bg += 1
+            self.channel.latency_bg.append(self.frame_to_send.t_to_send)
         elif self.config.cw_min == 15 and self.config.cw_max == 1023 and self.config.aifsn == 3:
             self.channel.succeeded_transmissions_be += 1
+            self.channel.latency_be.append(self.frame_to_send.t_to_send)
         elif self.config.cw_min == 3 and self.config.cw_max == 15 and self.config.aifsn == 2:
             self.channel.succeeded_transmissions_vd += 1
+            self.channel.latency_vd.append(self.frame_to_send.t_to_send)
         else:
             self.channel.succeeded_transmissions_vc += 1
+            self.channel.latency_vc.append(self.frame_to_send.t_to_send)
 
         self.succeeded_transmissions += 1
         self.failed_transmissions_in_row = 0
@@ -369,7 +389,7 @@ class Gnb:
             buffer_size
     ):
         self.config_nr = config_nr
-        self.buffer_size = buffer_size
+        self.buffer_size = buffer_size*1000
         self.transtime = transtime
         # self.times = Times(config.data_size, config.mcs)  # using Times script to get time calculations
         self.name = name  # name of the station
@@ -403,16 +423,16 @@ class Gnb:
         self.Queue = Queue
 
 
-    def wait_for_frame(self):
-        yield self.env.timeout(self.sumTime)
+    def wait_for_frame(self,time_to_wait):
+        yield self.env.timeout(time_to_wait)
         self.start_generating()
 
     def start_generating(self):
         self.sumTime = numpy.random.exponential(1 / self.poisson_lambda) * 1000
         if self.buffer_size is None or len(self.Queue[self.name]) <= self.buffer_size:
-            self.Queue[self.name].append(1)
-            self.transmission_to_send=self.gen_new_transmission()
-        self.env.process(self.wait_for_frame())
+            self.Queue[self.name].append(self.gen_new_transmission())
+            #self.transmission_to_send=self.gen_new_transmission()
+        self.env.process(self.wait_for_frame(self.sumTime))
 
     def start(self):
         if self.poisson_lambda is not None:
@@ -421,21 +441,22 @@ class Gnb:
         while True:
             if len(self.Queue[self.name]) > 0 or self.poisson_lambda is None:
                 if self.poisson_lambda is not None:
+                    self.transmission_to_send = self.Queue[self.name][0]
                     self.Queue[self.name].pop(0)
+                    self.was_sent = False
                     pass
                 else:
                     pass
-                self.transmission_to_send = self.gen_new_transmission()
-                was_sent = False
-                while not was_sent:
+
+                while not self.was_sent:
                     if gap:
                         self.process = self.env.process(self.wait_back_off_gap())
                         yield self.process
-                        was_sent = yield self.env.process(self.send_transmission())
+                        self.was_sent = yield self.env.process(self.send_transmission())
                     else:
                         self.process = self.env.process(self.wait_back_off())
                         yield self.process
-                        was_sent = yield self.env.process(self.send_transmission())
+                        self.was_sent = yield self.env.process(self.send_transmission())
             elif bool([a for a in self.Queue.values() if a == []]):
                 self.env.step()
 
@@ -661,6 +682,7 @@ class Gnb:
         else:
             rs_time = self.next_sync_slot_boundry - self.env.now
         airtime = transmission_time - rs_time
+
         return Transmission_NR(transmission_time, self.name, self.col, self.env.now, airtime, rs_time)
 
     def generate_new_back_off_time(self, failed_transmissions_in_row):
@@ -688,22 +710,41 @@ class Gnb:
             self.transmission_to_send=self.gen_new_transmission()
             self.failed_transmissions_in_row = 0
 
+    def getTypeFromgNb(self):
+        if self.config_nr.cw_min == 15 and self.config_nr.cw_max == 1023 and self.config_nr.M == 7:
+            return "c4"
+        elif self.config_nr.cw_min == 15 and self.config_nr.cw_max == 63 and self.config_nr.M == 3:
+            return "c3"
+        elif self.config_nr.cw_min == 7 and self.config_nr.cw_max == 15 and self.config_nr.M == 1:
+            return "c2"
+        elif self.config_nr.cw_min == 3 and self.config_nr.cw_max == 7 and self.config_nr.M == 1:
+            return "c1"
+
     def sent_completed(self):
         log(self, f"Successfully sent transmission")
         self.transmission_to_send.t_end = self.env.now
         self.transmission_to_send.t_to_send = (self.transmission_to_send.t_end - self.transmission_to_send.t_start)
+        self.channel.latency_nru.append(self.transmission_to_send.t_to_send)
+
         self.channel.succeeded_transmissions_NR += 1
         self.succeeded_transmissions += 1
         self.failed_transmissions_in_row = 0
 
-        if self.config_nr.cw_min == 15 and self.config_nr.cw_max == 1023 and self.config_nr.M==8:
-            self.channel.succeeded_transmissions_c1 += 1
-        elif self.config_nr.cw_min == 15 and self.config_nr.cw_max == 63 and self.config_nr.M==8:
-            self.channel.succeeded_transmissions_c2 += 1
-        elif self.config_nr.cw_min == 7 and self.config_nr.cw_max == 15 and self.config_nr.M==3:
-            self.channel.succeeded_transmissions_c3 += 1
-        else:
+        if self.config_nr.cw_min == 15 and self.config_nr.cw_max == 1023 and self.config_nr.M==7:
             self.channel.succeeded_transmissions_c4 += 1
+            self.channel.latency_c4.append(self.transmission_to_send.t_to_send)
+
+        elif self.config_nr.cw_min == 15 and self.config_nr.cw_max == 63 and self.config_nr.M==3:
+            self.channel.succeeded_transmissions_c3 += 1
+            self.channel.latency_c3.append(self.transmission_to_send.t_to_send)
+
+        elif self.config_nr.cw_min == 7 and self.config_nr.cw_max == 15 and self.config_nr.M==1:
+            self.channel.succeeded_transmissions_c2 += 1
+            self.channel.latency_c2.append(self.transmission_to_send.t_to_send)
+
+        elif self.config_nr.cw_min == 3 and self.config_nr.cw_max == 7 and self.config_nr.M == 1:
+            self.channel.succeeded_transmissions_c1 += 1
+            self.channel.latency_c1.append(self.transmission_to_send.t_to_send)
 
         return True
 
@@ -720,6 +761,7 @@ class Channel:
     airtime_control: Dict[str, int]
     airtime_data_NR: Dict[str, int]
     airtime_control_NR: Dict[str, int]
+
     tx_list: List[Station] = field(default_factory=list)  # transmitting stations in the channel
     back_off_list: List[Station] = field(default_factory=list)  # stations in backoff phase
     tx_list_NR: List[Gnb] = field(default_factory=list)  # transmitting stations in the channel
@@ -740,6 +782,19 @@ class Channel:
     succeeded_transmissions_c3: int = 0
     succeeded_transmissions_c4: int = 0
 
+    latency_wifi: List[complex] = field(default_factory=list)
+    latency_nru: List[complex] = field(default_factory=list)
+
+    latency_be: List[complex] = field(default_factory=list)
+    latency_bg: List[complex] = field(default_factory=list)
+    latency_vc: List[complex] = field(default_factory=list)
+    latency_vd: List[complex] = field(default_factory=list)
+
+    latency_c1: List[complex] = field(default_factory=list)
+    latency_c2: List[complex] = field(default_factory=list)
+    latency_c3: List[complex] = field(default_factory=list)
+    latency_c4: List[complex] = field(default_factory=list)
+
     rts_list: List[Station] = field(default_factory=list)
     succeeded_rts: int = 0
     failed_rts: int = 0
@@ -747,9 +802,6 @@ class Channel:
     bytes_sent: int = 0  # total bytes sent
     failed_transmissions_NR: int = 0  # total failed transmissions
     succeeded_transmissions_NR: int = 0  # total succeeded transmissions
-
-
-
 
 @dataclass()
 class Frame:
@@ -863,7 +915,7 @@ def run_simulation(
             Station(environment, "Station {}".format(i), channel=channel, config=config_local,simulation_time=simulation_time,poisson_lambda=poisson_lambda,backoffs={key: {1: 0} for key in range(config.cw_max + 1)},transtime=transtime,Queue=Queue,buffer_size=buffer_size)
         # 3rd group - Video
         elif i in range (number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+1,number_of_stations["backgroundStations"]+number_of_stations["bestEffortStations"]+number_of_stations["videoStations"]+1):
-            config_local = Config(config.data_size, 3, 15, config.r_limit, config.mcs, 2,RTS_threshold,standard,nAMPDU,nSS)
+            config_local = Config(config.data_size, 7, 15, config.r_limit, config.mcs, 2,RTS_threshold,standard,nAMPDU,nSS)
             Station(environment, "Station {}".format(i), channel,transtime, config_local,simulation_time,poisson_lambda,backoffs={key: {1: 0} for key in range(15 + 1)},Queue=Queue,buffer_size=buffer_size)
         # 4th group - Voice
         else:
@@ -877,33 +929,33 @@ def run_simulation(
         if i in range (1,number_of_gnb["class_1"]+1):
             config_nr_local = Config_NR(deter_period=config_nr.deter_period, observation_slot_duration=config_nr.synchronization_slot_duration,
                                         synchronization_slot_duration=config_nr.synchronization_slot_duration,max_sync_slot_desync=config_nr.max_sync_slot_desync,
-                                        min_sync_slot_desync=config_nr.min_sync_slot_desync, M=7, cw_min=15, cw_max=1023,retry_limit=config_nr.retry_limit,
-                                        mcot=8)
-            Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr_local, transtime=transtime,backoffs={key: {1: 0} for key in range(1023 + 1)}, poisson_lambda=poisson_lambda, Queue=Queue,buffer_size=buffer_size)
+                                        min_sync_slot_desync=config_nr.min_sync_slot_desync, M=1, cw_min=3, cw_max=7,retry_limit=config_nr.retry_limit,
+                                        mcot=2)
+            Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr_local, transtime=transtime,backoffs={key: {1: 0} for key in range(7 + 1)}, poisson_lambda=poisson_lambda, Queue=Queue,buffer_size=buffer_size)
 
         # 2nd group - Class 2
         elif i in range (number_of_gnb["class_1"]+1,number_of_gnb["class_1"]+number_of_gnb["class_2"]+1):
-            config_nr_local = Config_NR(deter_period=config_nr.deter_period, observation_slot_duration=config_nr.synchronization_slot_duration,
-                                        synchronization_slot_duration=config_nr.synchronization_slot_duration, max_sync_slot_desync=config_nr.max_sync_slot_desync,
-                                        min_sync_slot_desync=config_nr.min_sync_slot_desync, M=3, cw_min=15, cw_max=63, retry_limit=config_nr.retry_limit,
-                                        mcot=3)
-            Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr_local, transtime=transtime,backoffs={key: {1: 0} for key in range(63 + 1)}, poisson_lambda=poisson_lambda, Queue=Queue,buffer_size=buffer_size)
-
-        # 3rd group - Class 3
-        elif i in range (number_of_gnb["class_1"]+number_of_gnb["class_2"]+1,number_of_gnb["class_1"]+number_of_gnb["class_2"]+number_of_gnb["class_3"]+1):
             config_nr_local = Config_NR(deter_period=config_nr.deter_period, observation_slot_duration=config_nr.synchronization_slot_duration,
                                         synchronization_slot_duration=config_nr.synchronization_slot_duration, max_sync_slot_desync=config_nr.max_sync_slot_desync,
                                         min_sync_slot_desync=config_nr.min_sync_slot_desync, M=1, cw_min=7, cw_max=15, retry_limit=config_nr.retry_limit,
                                         mcot=3)
             Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr_local, transtime=transtime,backoffs={key: {1: 0} for key in range(15 + 1)}, poisson_lambda=poisson_lambda, Queue=Queue,buffer_size=buffer_size)
 
+        # 3rd group - Class 3
+        elif i in range (number_of_gnb["class_1"]+number_of_gnb["class_2"]+1,number_of_gnb["class_1"]+number_of_gnb["class_2"]+number_of_gnb["class_3"]+1):
+            config_nr_local = Config_NR(deter_period=config_nr.deter_period, observation_slot_duration=config_nr.synchronization_slot_duration,
+                                        synchronization_slot_duration=config_nr.synchronization_slot_duration, max_sync_slot_desync=config_nr.max_sync_slot_desync,
+                                        min_sync_slot_desync=config_nr.min_sync_slot_desync, M=3, cw_min=15, cw_max=63, retry_limit=config_nr.retry_limit,
+                                        mcot=3)
+            Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr_local, transtime=transtime,backoffs={key: {1: 0} for key in range(63 + 1)}, poisson_lambda=poisson_lambda, Queue=Queue,buffer_size=buffer_size)
+
         # 4th group - Class 4
         else:
             config_nr_local = Config_NR(deter_period=config_nr.deter_period, observation_slot_duration=config_nr.synchronization_slot_duration,
                                         synchronization_slot_duration=config_nr.synchronization_slot_duration, max_sync_slot_desync=config_nr.max_sync_slot_desync,
-                                        min_sync_slot_desync=config_nr.min_sync_slot_desync, M=1, cw_min=3, cw_max=7, retry_limit=config_nr.retry_limit,
-                                        mcot=2)
-            Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr_local, transtime=transtime,backoffs={key: {1: 0} for key in range(7 + 1)}, poisson_lambda=poisson_lambda, Queue=Queue,buffer_size=buffer_size)
+                                        min_sync_slot_desync=config_nr.min_sync_slot_desync, M=7, cw_min=15, cw_max=1023, retry_limit=config_nr.retry_limit,
+                                        mcot=8)
+            Gnb(environment, "Gnb {}".format(i), channel=channel, config_nr=config_nr_local, transtime=transtime,backoffs={key: {1: 0} for key in range(1023 + 1)}, poisson_lambda=poisson_lambda, Queue=Queue,buffer_size=buffer_size)
 
 
     # for i in range(1, number_of_gnb + 1):
@@ -986,6 +1038,27 @@ def run_simulation(
     c3AirTime = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_3") / (simulation_time * 1000000)
     c4AirTime = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_4") / (simulation_time * 1000000)
 
+    # WiFi latency calculation
+    avg_latency_wifi = ((sum(channel.latency_wifi))/(len(channel.latency_wifi)))/ (1000000)
+
+    # WiFi EDCA latency calculation
+    avg_latency_be = ((sum(channel.latency_be))   / (len(channel.latency_be)+1)) /  (1000000)
+    avg_latency_bg = ((sum(channel.latency_bg))   / (len(channel.latency_bg)+1)) /  (1000000)
+    avg_latency_vd = ((sum(channel.latency_vd))   / (len(channel.latency_vd)+1)) /  (1000000)
+    avg_latency_vc = ((sum(channel.latency_vc))   / (len(channel.latency_vc)+1)) /  (1000000)
+
+    # NR-U latency calculation
+    try:
+        avg_latency_nru = (sum(channel.latency_nru)/(len(channel.latency_nru)))/ (1000000)
+    except:
+        avg_latency_nru = None
+
+    # NR-U categories latency calculation
+    avg_latency_c1 = ((sum(channel.latency_c1)) / (len(channel.latency_c1) + 1)) / (1000000)
+    avg_latency_c2 = ((sum(channel.latency_c2)) / (len(channel.latency_c2) + 1)) / (1000000)
+    avg_latency_c3 = ((sum(channel.latency_c3)) / (len(channel.latency_c3) + 1)) / (1000000)
+    avg_latency_c4 = ((sum(channel.latency_c4)) / (len(channel.latency_c4) + 1)) / (1000000)
+
     print(" BE: ",beAirTime," BG: ",bgAirTime," VD: ",vdAirTime," VC: ",vcAirTime)
     print(" C1: ", c1AirTime, "C2: ", c2AirTime, "C3: ", c3AirTime, "C4: ", c4AirTime)
 
@@ -1007,6 +1080,10 @@ def run_simulation(
     print("nAMPDU: ", nAMPDU)
     print("nSS: ", nSS)
     print("buffer: ", buffer_size)
+    print("AVG latency WiFi: ", avg_latency_wifi)
+    print("AVG latency WiFi EDCA: ", "BG: ",avg_latency_bg, "BE: ",avg_latency_be, "VD: ",avg_latency_vd, "VO: ",avg_latency_vc)
+    print("AVG latency NR-U: ", avg_latency_nru)
+    print("AVG latency NR-U CATEGORIES: ", "C1: ", avg_latency_c1, "C2: ", avg_latency_c2, "C3: ", avg_latency_c3, "C4: ", avg_latency_c4)
     print("------------------------------------------------------------------------------------------")
     print("")
 
@@ -1019,7 +1096,9 @@ def run_simulation(
     with open(output_csv, mode='a', newline="") as result_file:
         result_adder = csv.writer(result_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
         firstliner='Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcollWiFi,ChannelOccupancyNR,ChannelEfficiencyNR,PcollNR,ChannelOccupancyAll,ChannelEfficiencyAll,' \
-                   'Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,cw_min,mcs,retryLimit,sync,lenLte,distribution_k,nMPDU,nss,buffer,c1AirTime,c2AirTime,c3AirTime,c4AirTime,thrpt_c1,thrpt_c2,thrpt_c3,thrpt_c4'
+                   'Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,cw_min,mcs,retryLimit,sync,' \
+                   'lenLte,distribution_k,nMPDU,nss,buffer,c1AirTime,c2AirTime,c3AirTime,c4AirTime,thrpt_c1,thrpt_c2,thrpt_c3,thrpt_c4,' \
+                   'latency_wifi,latency_nru,latency_bg,latency_be,latency_vd,latency_vc,latency_c1,latency_c2,latency_c3,latency_c4'
 
         if write_header:
             result_adder.writerow([firstliner.strip('"')])
@@ -1032,7 +1111,8 @@ def run_simulation(
              config.data_size,simulation_time,jain_fair_index,beAirTime,vdAirTime,vcAirTime,bgAirTime,poisson_lambda,
              thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,config.cw_min,config.mcs,config.r_limit,config_nr.synchronization_slot_duration,
              transtime,distribution_k,nMPDU,nSS,buffer_size,c1AirTime,c2AirTime,c3AirTime,
-             c4AirTime,thrpt_c1,thrpt_c2,thrpt_c3,thrpt_c4])
+             c4AirTime,thrpt_c1,thrpt_c2,thrpt_c3,thrpt_c4,avg_latency_wifi,avg_latency_nru,avg_latency_bg,avg_latency_be,
+             avg_latency_vd,avg_latency_vc,avg_latency_c1,avg_latency_c2,avg_latency_c3,avg_latency_c4])
 
 
 
