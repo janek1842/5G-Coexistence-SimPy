@@ -25,15 +25,15 @@ def valid_single_simulation():
 
     # Simulation results parameters
     domain = 'lambda'
-    anti_domain = 'latency_wifi'
+    anti_domain = 'jitter_wifi'
 
     sim1_label = "5G-Coex-SimPy"
-    sim1 = pd.read_csv('csvresults/V4/latency/test2.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/V4/latency/test7.csv', delimiter=',')
 
     x_axis_description = "Lambda"
-    y_axis_description = "Average latency [s]"
+    y_axis_description = "Jitter"
 
-    result_file_path = 'csvresults/V4/latency2.svg'
+    result_file_path = 'csvresults/V4/latency/jitter1.svg'
 
     # t-student parameter for confidence intervals
     alfa = 0.05
@@ -51,10 +51,10 @@ def valid_single_simulation():
     sim1 = sim1.groupby([domain])[anti_domain].mean()
 
     # Results plotting
-    sim1_plot = sim1.plot(marker='o', legend=True,yerr=sim1_err,capsize=4,ylim=[0,0.5])
+    sim1_plot = sim1.plot(marker='o', legend=True,yerr=sim1_err,capsize=4)
     sim1_plot.xaxis.set_major_locator(MaxNLocator(integer=True))
     # log scale
-    sim1_plot.set_xscale('log')
+    #sim1_plot.set_xscale('log')
 
     sim1_plot.legend([sim1_label])
     sim1_plot.set_xlabel(x_axis_description, fontsize=14)
@@ -541,8 +541,8 @@ if __name__ == "__main__":
     #print_four_simulations()
     #print_eight_simulations()
     #valid_two_simulations()
-    #valid_single_simulation()
-    valid_four_simulations()
+    valid_single_simulation()
+    #valid_four_simulations()
     #valid_two_simulations()
     #print_buffer_simulations_v2()
 

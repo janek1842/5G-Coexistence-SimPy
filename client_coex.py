@@ -49,7 +49,7 @@ def single_run(
 
 if __name__ == "__main__":
 
-    #performing multiple runs
+    #Performing multiple runs
     list = []
     for radn in range(1,100):
         n = random.randint(10, 1000)
@@ -57,15 +57,15 @@ if __name__ == "__main__":
 
     print("SEEDS: ",list)
 
-    # sync values: 9, 18, 36, 63, 125, 250, 500, or 1000 μs
+    # sync available values: 9, 18, 36, 63, 125, 250, 500, or 1000 [μs]
 
     for var in list:
-        for i in [0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1,0.12,0.14]:
+        for i in [0.002,0.004,0.006,0.008,0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1,0.12,0.14]:
 
             # WiFi EDCA categories
             stationsConfig = {
                 "backgroundStations": 0,
-                "bestEffortStations": 1,
+                "bestEffortStations": 4,
                 "videoStations": 0,
                 "voiceStations": 0
             }
@@ -75,26 +75,26 @@ if __name__ == "__main__":
                 "class_1": 0,
                 "class_2": 0,
                 "class_3": 0,
-                "class_4": 1
+                "class_4": 0
             }
 
             # for j in [1,10,20,30]:
             single_run(seeds=var,
                        stations_number=stationsConfig,
                        gnb_number=gNBsConfig,
-                       simulation_time=10,
+                       simulation_time=100,
                        payload_size=1500,
                        cw_min=15,
                        cw_max=1023,
                        r_limit=7,
                        mcs_value=7,
                        poisson_lambda=i,
-                       sync=125,
+                       sync=1000,
                        transtime=5000,
                        distribution_k = 1,
                        RTS_threshold = 9000000000,
                        wifi_standard = "802.11a", # 802.11ac or 802.11a
                        nAMPDUs = 1,
                        nSS = 1,
-                       buffer_size = 3000
+                       buffer_size = 3000000000
                        )

@@ -17,7 +17,7 @@ from .Times import *
 from datetime import datetime
 from collections import defaultdict
 
-output_csv = "csvresults/V4/latency/test5.csv"
+output_csv = "csvresults/V4/latency/test7.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
 
 typ_filename = "RS_coex_1sta_1wifi2.log"
@@ -129,7 +129,7 @@ class Station:
         self.sumTime =0
         self.simulation_time = simulation_time
         self.Queue = Queue
-        self.buffer_size = buffer_size/3000
+        self.buffer_size = buffer_size
 
     def wait_for_frame(self,time_to_wait):
         yield self.env.timeout(time_to_wait)
@@ -389,7 +389,7 @@ class Gnb:
             buffer_size
     ):
         self.config_nr = config_nr
-        self.buffer_size = buffer_size*1000
+        self.buffer_size = buffer_size
         self.transtime = transtime
         # self.times = Times(config.data_size, config.mcs)  # using Times script to get time calculations
         self.name = name  # name of the station
@@ -995,32 +995,28 @@ def run_simulation(
         channel_occupancy_time_NR += channel.airtime_data_NR["Gnb {}".format(i)] + channel.airtime_control_NR["Gnb {}".format(i)]
         channel_efficiency_NR += channel.airtime_data_NR["Gnb {}".format(i)]
 
+    # General metrics calculation
     normalized_channel_occupancy_time = channel_occupancy_time / time
     normalized_channel_efficiency = channel_efficiency / time
-
     normalized_channel_occupancy_time_NR = channel_occupancy_time_NR / time
     normalized_channel_efficiency_NR = channel_efficiency_NR / time
-
     normalized_channel_occupancy_time_all = (channel_occupancy_time + channel_occupancy_time_NR) / time
     normalized_channel_efficiency_all = (channel_efficiency + channel_efficiency_NR) / time
-
     throughput=(channel.succeeded_transmissions * config.data_size * 8) / (simulation_time * 1000000)
 
+    # EDCA throughput calculation
     thrpt_vc = (channel.succeeded_transmissions_vc * config.data_size * 8) / (simulation_time * 1000000)
     thrpt_vd = (channel.succeeded_transmissions_vd * config.data_size * 8) / (simulation_time * 1000000)
     thrpt_be = (channel.succeeded_transmissions_be * config.data_size * 8) / (simulation_time * 1000000)
     thrpt_bg = (channel.succeeded_transmissions_bg * config.data_size * 8) / (simulation_time * 1000000)
 
-    thrpt_c1 = (channel.succeeded_transmissions_c1 *8) / (simulation_time * 1000000)
-    thrpt_c2 = (channel.succeeded_transmissions_c2 *8) / (simulation_time * 1000000)
-    thrpt_c3 = (channel.succeeded_transmissions_c3 *8) / (simulation_time * 1000000)
-    thrpt_c4 = (channel.succeeded_transmissions_c4 *8) / (simulation_time * 1000000)
+    # NR-U categories throughput calculation (FOR FUTURE EXTENSION)
+    thrpt_c1 = (channel.succeeded_transmissions_c1 * 8) / (simulation_time * 1000000)
+    thrpt_c2 = (channel.succeeded_transmissions_c2 * 8) / (simulation_time * 1000000)
+    thrpt_c3 = (channel.succeeded_transmissions_c3 * 8) / (simulation_time * 1000000)
+    thrpt_c4 = (channel.succeeded_transmissions_c4 * 8) / (simulation_time * 1000000)
 
-    print("")
-    print("------------------------------------------------------------------------------------------")
-    print(" T_VC: ", thrpt_vc, " T_VD: ",thrpt_vd, " T_BE: ",thrpt_be, " T_BG: ",thrpt_bg)
-    print(" T_C1: ", thrpt_c1, " T_C2: ", thrpt_c2, " T_C3: ", thrpt_c3, " T_C4: ", thrpt_c4)
-
+    # Jain's fairness index calculation
     jain_dict = airtime_data
     jain_dict.update(airtime_data_NR)
     try:
@@ -1028,11 +1024,13 @@ def run_simulation(
     except:
         jain_fair_index = 0
 
+    # EDCA airtime calculation
     beAirTime = getWifiTimeCategories(number_of_stations,airtime_data,"bestEffort") / (simulation_time * 1000000)
     vdAirTime = getWifiTimeCategories(number_of_stations,airtime_data,"video") / (simulation_time * 1000000)
     vcAirTime = getWifiTimeCategories(number_of_stations,airtime_data,"voice") / (simulation_time * 1000000)
     bgAirTime = getWifiTimeCategories(number_of_stations,airtime_data,"background") / (simulation_time * 1000000)
 
+    # NR-U airtime calculation
     c1AirTime = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_1") / (simulation_time * 1000000)
     c2AirTime = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_2") / (simulation_time * 1000000)
     c3AirTime = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_3") / (simulation_time * 1000000)
@@ -1059,9 +1057,47 @@ def run_simulation(
     avg_latency_c3 = ((sum(channel.latency_c3)) / (len(channel.latency_c3) + 1)) / (1000000)
     avg_latency_c4 = ((sum(channel.latency_c4)) / (len(channel.latency_c4) + 1)) / (1000000)
 
+    # WiFi jitter calculation
+    jitter_wifi = numpy.var(channel.latency_wifi)/ (1000000)
+
+    # EDCA jitter calculation
+    jitter_be = numpy.var(channel.latency_be)/ (1000000)
+    jitter_bg = numpy.var(channel.latency_bg)/ (1000000)
+    jitter_vd = numpy.var(channel.latency_vd)/ (1000000)
+    jitter_vc = numpy.var(channel.latency_vc)/ (1000000)
+
+    # NR-U latency calculation
+    jitter_nru = numpy.var(channel.latency_nru)/ (1000000)
+
+    # NR-U categories latency calculation
+    jitter_c1 = numpy.var(channel.latency_c1)/ (1000000)
+    jitter_c2 = numpy.var(channel.latency_c2)/ (1000000)
+    jitter_c3 = numpy.var(channel.latency_c3)/ (1000000)
+    jitter_c4 = numpy.var(channel.latency_c4)/ (1000000)
+
+    # Printing results
+    print("------------------------------------------------------------------------------------------")
+    print("")
+    print("THROUGHPUT")
+    print(" T_VC: ", thrpt_vc, " T_VD: ",thrpt_vd, " T_BE: ",thrpt_be, " T_BG: ",thrpt_bg)
+    print(" T_C1: ", thrpt_c1, " T_C2: ", thrpt_c2, " T_C3: ", thrpt_c3, " T_C4: ", thrpt_c4)
+    print("")
+    print("AIR TIME")
     print(" BE: ",beAirTime," BG: ",bgAirTime," VD: ",vdAirTime," VC: ",vcAirTime)
     print(" C1: ", c1AirTime, "C2: ", c2AirTime, "C3: ", c3AirTime, "C4: ", c4AirTime)
-
+    print("")
+    print("LATENCY")
+    print("WiFi: ", avg_latency_wifi)
+    print("BG: ",avg_latency_bg, "BE: ",avg_latency_be, "VD: ",avg_latency_vd, "VO: ",avg_latency_vc)
+    print("NR-U: ", avg_latency_nru)
+    print("C1: ", avg_latency_c1, "C2: ", avg_latency_c2, "C3: ", avg_latency_c3, "C4: ", avg_latency_c4)
+    print("")
+    print("JITTER")
+    print("WiFi: ", jitter_wifi)
+    print("BG: ", jitter_bg, "BE: ", jitter_be, "VD: ", jitter_vd, "VO: ", jitter_vc)
+    print("NR-U: ", jitter_nru)
+    print("C1: ", jitter_c1, "C2: ", jitter_c2, "C3: ", jitter_c3, "C4: ", jitter_c4)
+    print("")
     print(
         f"SEED = {seed} N_stations:={sum(number_of_stations.values())} N_gNB:={sum(number_of_gnb.values())}  CW_MIN = {config.cw_min} CW_MAX = {config.cw_max} "
         f"WiFi pcol:={p_coll} WiFi cot:={normalized_channel_occupancy_time} WiFi eff:={normalized_channel_efficiency} "
@@ -1080,16 +1116,10 @@ def run_simulation(
     print("nAMPDU: ", nAMPDU)
     print("nSS: ", nSS)
     print("buffer: ", buffer_size)
-    print("AVG latency WiFi: ", avg_latency_wifi)
-    print("AVG latency WiFi EDCA: ", "BG: ",avg_latency_bg, "BE: ",avg_latency_be, "VD: ",avg_latency_vd, "VO: ",avg_latency_vc)
-    print("AVG latency NR-U: ", avg_latency_nru)
-    print("AVG latency NR-U CATEGORIES: ", "C1: ", avg_latency_c1, "C2: ", avg_latency_c2, "C3: ", avg_latency_c3, "C4: ", avg_latency_c4)
     print("------------------------------------------------------------------------------------------")
     print("")
 
-
     # SAVING RESULTS TO THE CSV
-
     write_header = True
     if os.path.isfile(output_csv):
         write_header = False
@@ -1098,7 +1128,8 @@ def run_simulation(
         firstliner='Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcollWiFi,ChannelOccupancyNR,ChannelEfficiencyNR,PcollNR,ChannelOccupancyAll,ChannelEfficiencyAll,' \
                    'Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,cw_min,mcs,retryLimit,sync,' \
                    'lenLte,distribution_k,nMPDU,nss,buffer,c1AirTime,c2AirTime,c3AirTime,c4AirTime,thrpt_c1,thrpt_c2,thrpt_c3,thrpt_c4,' \
-                   'latency_wifi,latency_nru,latency_bg,latency_be,latency_vd,latency_vc,latency_c1,latency_c2,latency_c3,latency_c4'
+                   'latency_wifi,latency_nru,latency_bg,latency_be,latency_vd,latency_vc,latency_c1,latency_c2,latency_c3,latency_c4,jitter_wifi,jitter_be,jitter_bg,jitter_vd,jitter_vc,' \
+                   'jitter_nru,jitter_c1,jitter_c2,jitter_c3,jitter_c4'
 
         if write_header:
             result_adder.writerow([firstliner.strip('"')])
@@ -1112,7 +1143,8 @@ def run_simulation(
              thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,config.cw_min,config.mcs,config.r_limit,config_nr.synchronization_slot_duration,
              transtime,distribution_k,nMPDU,nSS,buffer_size,c1AirTime,c2AirTime,c3AirTime,
              c4AirTime,thrpt_c1,thrpt_c2,thrpt_c3,thrpt_c4,avg_latency_wifi,avg_latency_nru,avg_latency_bg,avg_latency_be,
-             avg_latency_vd,avg_latency_vc,avg_latency_c1,avg_latency_c2,avg_latency_c3,avg_latency_c4])
+             avg_latency_vd,avg_latency_vc,avg_latency_c1,avg_latency_c2,avg_latency_c3,avg_latency_c4,jitter_wifi,jitter_be,jitter_bg,jitter_vd,jitter_vc,jitter_nru,jitter_c1,
+             jitter_c2,jitter_c3,jitter_c4])
 
 
 
