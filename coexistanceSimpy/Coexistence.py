@@ -316,6 +316,16 @@ class Station:
         log(self, "There was a collision")
         self.frame_to_send.number_of_retransmissions += 1
         self.channel.failed_transmissions += 1
+
+        if self.config.cw_min == 15 and self.config.cw_max == 1023 and self.config.aifsn==7:
+            self.channel.failed_transmissions_bg += 1
+        elif self.config.cw_min == 15 and self.config.cw_max == 1023 and self.config.aifsn == 3:
+            self.channel.failed_transmissions_be += 1
+        elif self.config.cw_min == 3 and self.config.cw_max == 15 and self.config.aifsn == 2:
+            self.channel.failed_transmissions_vd += 1
+        else:
+            self.channel.failed_transmissions_vc += 1
+
         self.failed_transmissions += 1
         self.failed_transmissions_in_row += 1
 
@@ -706,6 +716,15 @@ class Gnb:
         self.failed_transmissions_in_row += 1
         log(self, self.channel.failed_transmissions_NR)
 
+        if self.config_nr.cw_min == 15 and self.config_nr.cw_max == 1023 and self.config_nr.M==7:
+            self.channel.failed_transmissions_c4 += 1
+        elif self.config_nr.cw_min == 15 and self.config_nr.cw_max == 63 and self.config_nr.M==3:
+            self.channel.failed_transmissions_c3 += 1
+        elif self.config_nr.cw_min == 7 and self.config_nr.cw_max == 15 and self.config_nr.M==1:
+            self.channel.failed_transmissions_c2 += 1
+        elif self.config_nr.cw_min == 3 and self.config_nr.cw_max == 7 and self.config_nr.M == 1:
+            self.channel.failed_transmissions_c1 += 1
+
         if self.transmission_to_send.number_of_retransmissions > self.config_nr.retry_limit:
             self.transmission_to_send=self.gen_new_transmission()
             self.failed_transmissions_in_row = 0
@@ -767,20 +786,20 @@ class Channel:
     tx_list_NR: List[Gnb] = field(default_factory=list)  # transmitting stations in the channel
     back_off_list_NR: List[Gnb] = field(default_factory=list)  # stations in backoff phase
 
-    failed_transmissions: int = 0  # total failed transmissions
-    succeeded_transmissions: int = 0  # total succeeded transmissions
+    failed_transmissions: float = 0  # total failed transmissions
+    succeeded_transmissions: float = 0  # total succeeded transmissions
 
     # Stats for individual categories
 
-    succeeded_transmissions_be: int = 0
-    succeeded_transmissions_bg: int = 0
-    succeeded_transmissions_vc: int = 0
-    succeeded_transmissions_vd: int = 0
+    succeeded_transmissions_be: float = 0
+    succeeded_transmissions_bg: float = 0
+    succeeded_transmissions_vc: float = 0
+    succeeded_transmissions_vd: float = 0
 
-    succeeded_transmissions_c1: int = 0
-    succeeded_transmissions_c2: int = 0
-    succeeded_transmissions_c3: int = 0
-    succeeded_transmissions_c4: int = 0
+    succeeded_transmissions_c1: float = 0
+    succeeded_transmissions_c2: float = 0
+    succeeded_transmissions_c3: float = 0
+    succeeded_transmissions_c4: float = 0
 
     latency_wifi: List[complex] = field(default_factory=list)
     latency_nru: List[complex] = field(default_factory=list)
@@ -802,6 +821,16 @@ class Channel:
     bytes_sent: int = 0  # total bytes sent
     failed_transmissions_NR: int = 0  # total failed transmissions
     succeeded_transmissions_NR: int = 0  # total succeeded transmissions
+
+    failed_transmissions_c1: int = 0
+    failed_transmissions_c2: int = 0
+    failed_transmissions_c3: int = 0
+    failed_transmissions_c4: int = 0
+
+    failed_transmissions_bg: int = 0
+    failed_transmissions_be: int = 0
+    failed_transmissions_vd: int = 0
+    failed_transmissions_vc: int = 0
 
 @dataclass()
 class Frame:
@@ -1016,6 +1045,24 @@ def run_simulation(
     thrpt_c3 = (channel.succeeded_transmissions_c3 * 8) / (simulation_time * 1000000)
     thrpt_c4 = (channel.succeeded_transmissions_c4 * 8) / (simulation_time * 1000000)
 
+    # Wi-Fi PLR calculation
+    wifi_plr = channel.failed_transmissions / (channel.succeeded_transmissions+channel.failed_transmissions+1)
+
+    # EDCA PLR calculation
+    be_plr = channel.failed_transmissions_be / (channel.succeeded_transmissions_be+channel.failed_transmissions_be+1)
+    bg_plr = channel.failed_transmissions_bg / (channel.succeeded_transmissions_bg+channel.failed_transmissions_bg+1)
+    vd_plr = channel.failed_transmissions_vd / (channel.succeeded_transmissions_vd+channel.failed_transmissions_vd+1)
+    vo_plr = channel.failed_transmissions_vc / (channel.succeeded_transmissions_vc+channel.failed_transmissions_vc+1)
+
+    # NR-U PLR calculation
+    nr_plr = channel.failed_transmissions_NR / (channel.succeeded_transmissions_NR+channel.failed_transmissions_NR+1)
+
+    # NR-U categories PLR calculation
+    c1_plr = channel.failed_transmissions_c1 / (channel.succeeded_transmissions_c1+channel.failed_transmissions_c1+1)
+    c2_plr = channel.failed_transmissions_c2 / (channel.succeeded_transmissions_c2+channel.failed_transmissions_c2+1)
+    c3_plr = channel.failed_transmissions_c3 / (channel.succeeded_transmissions_c3+channel.failed_transmissions_c3+1)
+    c4_plr = channel.failed_transmissions_c4 / (channel.succeeded_transmissions_c4+channel.failed_transmissions_c4+1)
+
     # Jain's fairness index calculation
     jain_dict = airtime_data
     jain_dict.update(airtime_data_NR)
@@ -1037,7 +1084,7 @@ def run_simulation(
     c4AirTime = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_4") / (simulation_time * 1000000)
 
     # WiFi latency calculation
-    avg_latency_wifi = ((sum(channel.latency_wifi))/(len(channel.latency_wifi)))/ (1000000)
+    avg_latency_wifi = ((sum(channel.latency_wifi))/(len(channel.latency_wifi)+1))/ (1000000)
 
     # WiFi EDCA latency calculation
     avg_latency_be = ((sum(channel.latency_be))   / (len(channel.latency_be)+1)) /  (1000000)
@@ -1098,6 +1145,12 @@ def run_simulation(
     print("NR-U: ", jitter_nru)
     print("C1: ", jitter_c1, "C2: ", jitter_c2, "C3: ", jitter_c3, "C4: ", jitter_c4)
     print("")
+    print("Packet Loss Ratio")
+    print("WiFi: ", wifi_plr)
+    print("BG: ", bg_plr, "BE: ", be_plr, "VD: ", vd_plr, "VO: ", vo_plr)
+    print("NR-U: ", nr_plr)
+    print("C1: ", c1_plr, "C2: ", c2_plr, "C3: ", c3_plr, "C4: ", c4_plr)
+    print("")
     print(
         f"SEED = {seed} N_stations:={sum(number_of_stations.values())} N_gNB:={sum(number_of_gnb.values())}  CW_MIN = {config.cw_min} CW_MAX = {config.cw_max} "
         f"WiFi pcol:={p_coll} WiFi cot:={normalized_channel_occupancy_time} WiFi eff:={normalized_channel_efficiency} "
@@ -1129,7 +1182,7 @@ def run_simulation(
                    'Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,cw_min,mcs,retryLimit,sync,' \
                    'lenLte,distribution_k,nMPDU,nss,buffer,c1AirTime,c2AirTime,c3AirTime,c4AirTime,thrpt_c1,thrpt_c2,thrpt_c3,thrpt_c4,' \
                    'latency_wifi,latency_nru,latency_bg,latency_be,latency_vd,latency_vc,latency_c1,latency_c2,latency_c3,latency_c4,jitter_wifi,jitter_be,jitter_bg,jitter_vd,jitter_vc,' \
-                   'jitter_nru,jitter_c1,jitter_c2,jitter_c3,jitter_c4'
+                   'jitter_nru,jitter_c1,jitter_c2,jitter_c3,jitter_c4,wifi_plr,be_plr,bg_plr,vd_plr,vo_plr,nr_plr,c1_plr,c2_plr,c3_plr,c4_plr'
 
         if write_header:
             result_adder.writerow([firstliner.strip('"')])
@@ -1144,7 +1197,7 @@ def run_simulation(
              transtime,distribution_k,nMPDU,nSS,buffer_size,c1AirTime,c2AirTime,c3AirTime,
              c4AirTime,thrpt_c1,thrpt_c2,thrpt_c3,thrpt_c4,avg_latency_wifi,avg_latency_nru,avg_latency_bg,avg_latency_be,
              avg_latency_vd,avg_latency_vc,avg_latency_c1,avg_latency_c2,avg_latency_c3,avg_latency_c4,jitter_wifi,jitter_be,jitter_bg,jitter_vd,jitter_vc,jitter_nru,jitter_c1,
-             jitter_c2,jitter_c3,jitter_c4])
+             jitter_c2,jitter_c3,jitter_c4,wifi_plr,be_plr,bg_plr,vd_plr,vo_plr,nr_plr,c1_plr,c2_plr,c3_plr,c4_plr])
 
 
 
