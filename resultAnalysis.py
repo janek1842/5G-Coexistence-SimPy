@@ -138,7 +138,7 @@ def valid_four_simulations():
     sim2 = pd.read_csv('csvresults/V4/latency/test6.csv', delimiter=',')
 
     OX_description = "Lambda"
-    OY_description = "Average latency [s]"
+    OY_description = "Channel occupancy"
     result_file='csvresults/latency600.svg'
 
     lim_range = (0,1)
@@ -192,21 +192,21 @@ def print_four_simulations():
 
     domain = 'lambda'
     anti_domain_1 =  'c1AirTime'
-    anti_domain_2 =  'c2AirTime'
-    anti_domain_3 =  'c3AirTime'
-    anti_domain_4 =  'c4AirTime'
+    anti_domain_2 =  'c3AirTime'
+    anti_domain_3 =  'beAirTime'
+    anti_domain_4 =  'vcAirTime'
 
-    sim1_1_label = "5G-Coex-SimPy: CLASS 4"
+    sim1_1_label = "5G-Coex-SimPy: CLASS 1"
     sim1_2_label = "5G-Coex-SimPy: CLASS 3"
-    sim1_3_label = "5G-Coex-SimPy: CLASS 2"
-    sim1_4_label = "5G-Coex-SimPy: CLASS 1"
+    sim1_3_label = "5G-Coex-SimPy: AC_BE"
+    sim1_4_label = "5G-Coex-SimPy: AC_VO"
 
     # Simulation results parameters
-    sim1 = pd.read_csv('csvresults/V3/test1.csv', delimiter=',')
+    sim1 = pd.read_csv('csvresults/V6/testGAP3.csv', delimiter=',')
 
     OX_description = "Lambda"
     OY_description = "Channel occupancy"
-    result_file = 'csvresults/V3/test01.svg'
+    result_file = 'csvresults/V6/testGAP3.svg'
 
     # t-student parameter for confidence intervals
     alfa = 0.05
@@ -236,17 +236,17 @@ def print_four_simulations():
     sim1_4 = sim1.groupby([domain])[anti_domain_4].mean()
 
     # Results plotting
-    ax1 = sim1_1.plot(marker='o', legend=True , ylim=(0,2), mfc='none',yerr=sim1_1_err,capsize=4)
+    ax1 = sim1_1.plot(marker='o', legend=True, mfc='none',yerr=sim1_1_err,capsize=4)
     ax2 = sim1_2.plot(ax=ax1, marker='o', legend=True,yerr=sim1_2_err,capsize=4 )
     ax3 = sim1_3.plot(ax=ax2, marker='o', legend=True , mfc='none',yerr=sim1_3_err,capsize=4)
-    ax4 = sim1_4.plot(ax=ax3, marker='o', legend=True,yerr=sim1_4_err,capsize=4)
+    ax4 = sim1_4.plot(ax=ax3, marker='o', legend=True,yerr=sim1_4_err,capsize=4,ylim=[0,1])
 
     # log scale option
     #ax4.set_xscale('log')
 
     ax4.legend([sim1_1_label, sim1_2_label, sim1_3_label, sim1_4_label])
-    ax4.set_xlabel(OX_description, fontsize=14)
-    ax4.set_ylabel(OY_description, fontsize=14)
+    ax4.set_xlabel(OX_description,fontsize=14)
+    ax4.set_ylabel(OY_description,fontsize=14)
 
     plt.tight_layout()
     plt.savefig(result_file)
@@ -256,25 +256,25 @@ def print_eight_simulations():
 
     domain = 'lambda'
 
-    # anti_domain_1 =  'latency_c4'
-    # anti_domain_2 =  'latency_c3'
-    #anti_domain_3 =    'latency_c2'
-    anti_domain_4 =    'ChannelOccupancyWiFi'
+    anti_domain_1 =  'bgAirTime'
+    anti_domain_2 =  'beAirTime'
+    anti_domain_3 =  'vdAirTime'
+    anti_domain_4 =  'vcAirTime'
 
-    # anti_domain_5 =  'latency_bg'
-    # anti_domain_6 =  'latency_be'
-    # anti_domain_7 =  'latency_vd'
-    anti_domain_8 =  'ChannelOccupancyNR'
+    anti_domain_5 =  'c1AirTime'
+    anti_domain_6 =  'c2AirTime'
+    anti_domain_7 =  'c3AirTime'
+    anti_domain_8 =  'c4AirTime'
 
-    # sim1_1_label = "Class 4"
-    # sim1_2_label = "Class 3"
+    sim1_1_label = "AC_BG"
+    sim1_2_label = "AC_BE"
     sim1_3_label = "5G-Coex-SimPy: Wi-Fi (K=3000)"
     sim1_4_label = "5G-Coex-SimPy: NR-U (K=3000)"
 
-    # sim1_5_label = "AC_BG"
-    # sim1_6_label = "AC_BE"
-    #sim1_7_label = "AC_VI"
-    #sim1_8_label = "AC_VO"
+    sim1_5_label = "AC_BG"
+    sim1_6_label = "AC_BE"
+    sim1_7_label = "AC_VI"
+    sim1_8_label = "AC_VO"
 
     # Simulation results parameters
     sim1 = pd.read_csv('csvresults/V4/latency/test5.csv', delimiter=',')
@@ -538,10 +538,10 @@ def print_nr_simulations():
 
 
 if __name__ == "__main__":
-    #print_four_simulations()
+    print_four_simulations()
     #print_eight_simulations()
     #valid_two_simulations()
-    valid_single_simulation()
+    #valid_single_simulation()
     #valid_four_simulations()
     #valid_two_simulations()
     #print_buffer_simulations_v2()

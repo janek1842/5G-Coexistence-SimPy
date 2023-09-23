@@ -25,17 +25,20 @@ def single_run(
 
     airtime_data = {"Station {}".format(i): 0 for i in range(1, sum(stations_number.values()) + 1)}
     airtime_control = {"Station {}".format(i): 0 for i in range(1, sum(stations_number.values()) + 1)}
-
+    
     airtime_data_NR = {"Gnb {}".format(i): 0 for i in range(1, sum(gnb_number.values()) + 1)}
     airtime_control_NR = {"Gnb {}".format(i): 0 for i in range(1, sum(gnb_number.values()) + 1)}
 
     Queue = {"Station {}".format(i): [] for i in range(1, sum(stations_number.values()) + 1)}
     Queue.update({"Gnb {}".format(i): [] for i in range(1, sum(gnb_number.values()) + 1)})
 
-    # random packet size generation (ERLANG DISTRIBUTION)
-    #k = erlang.rvs(distribution_k,scale=1)
-    k = 1
-    payload_size = k * payload_size
+    # Random packet size generation (Erlang Distribution)
+    if distribution_k is not None:
+        k = erlang.rvs(distribution_k,scale=1)
+        payload_size = k * payload_size
+    else:
+        k = 1
+        payload_size = k * payload_size
 
     # 802.11ac Aggregation
     payload_size = nAMPDUs * payload_size
@@ -51,7 +54,7 @@ if __name__ == "__main__":
 
     #Performing multiple runs
     list = []
-    for radn in range(1,100):
+    for radn in range(1,500):
         n = random.randint(10, 1000)
         list.append(n)
 
@@ -60,22 +63,22 @@ if __name__ == "__main__":
     # sync available values: 9, 18, 36, 63, 125, 250, 500, or 1000 [μs]
 
     for var in list:
-        for i in [2,4,6,8,10,12,14,16,18,20,22]:
+        for i in [0.005,0.01,0.02,0.04,0.06,0.08,0.1,0.12,0.14,0.16,0.18,0.2]:
 
             # WiFi EDCA categories
             stationsConfig = {
-                "backgroundStations": i,
-                "bestEffortStations": i,
-                "videoStations": i,
-                "voiceStations": i
+                "backgroundStations": 0,
+                "bestEffortStations": 1,
+                "videoStations": 0,
+                "voiceStations": 1
             }
 
             # NR-U categories
             gNBsConfig = {
-                "class_1": i,
-                "class_2": i,
-                "class_3": i,
-                "class_4": i
+                "class_1": 1,
+                "class_2": 0,
+                "class_3": 1,
+                "class_4": 0
             }
 
             # for j in [1,10,20,30]:
@@ -88,13 +91,13 @@ if __name__ == "__main__":
                        cw_max=1023,
                        r_limit=7,
                        mcs_value=7,
-                       poisson_lambda=2,
-                       sync=9,
-                       transtime=5000,
-                       distribution_k = 1,
+                       poisson_lambda=i,
+                       sync=500,
+                       transtime=5400,
+                       distribution_k = None,
                        RTS_threshold = 9000000000,
                        wifi_standard = "802.11a", # 802.11ac or 802.11a
                        nAMPDUs = 1,
                        nSS = 1,
-                       buffer_size = 3000000000
+                       buffer_size = 1000
                        )
