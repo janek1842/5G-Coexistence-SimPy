@@ -2,7 +2,9 @@
 
 ### Introduction
 
-This is 5G-Coex-SimPy discrete-event simulator based on the SimPy Python library that allows to study and research coexistence between WiFi and NR-U (New Radio Unlicensed) technologies. My thesis was focused on the research and validation of existing functionalities as well as extending it with the following features:
+This is 5G-Coex-SimPy discrete-event simulator based on the SimPy Python library that allows to study and research coexistence between WiFi and NR-U (New Radio Unlicensed) technologies. 
+
+My Bachelor thesis was focused on the research and validation of existing functionalities as well as extending it with the following features:
 
 - EDCA
 - Non-saturated traffic generation
@@ -10,6 +12,12 @@ This is 5G-Coex-SimPy discrete-event simulator based on the SimPy Python library
 - Random packet size generation
 - RTS/CTS
 - 802.11ac
+
+My Master thesis is focused on the Quality of Service aspects of the above mentioned technologies coexisting in the same band. So far, I have managed to enrich the simulator with the following functionalities:
+
+- NR-U Access Categories
+- Arbitrary buffer size management
+- QoS metrics (throughput, latency, Packet Loss Ratio, jitter)
 
 ### How to run?
 
