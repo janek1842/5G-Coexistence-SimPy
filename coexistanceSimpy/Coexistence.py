@@ -17,7 +17,7 @@ from .Times import *
 from datetime import datetime
 from collections import defaultdict
 
-output_csv = "csvresults/V6/testGAP3.csv"
+output_csv = "csvresults/V6/testLevel.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
 
 typ_filename = "RS_coex_1sta_1wifi2.log"
@@ -129,14 +129,31 @@ class Station:
         self.Queue = Queue
         self.buffer_size = buffer_size
 
+    def getMaxLatencyFromBuffer(self,Queue):
+        tempTime=0
+        for i in Queue:
+            if (self.env.now-i.t_start) > tempTime:
+                tempTime = self.env.now-i.t_start
+        return tempTime/1000000
+
     def wait_for_frame(self,time_to_wait):
         yield self.env.timeout(time_to_wait)
         self.start_generating()
 
     def start_generating(self):
         self.sumTime = numpy.random.exponential(1 / self.poisson_lambda) * 1000
-        if self.buffer_size is None or len(self.Queue[self.name]) <= self.buffer_size:
+        if (self.buffer_size is None or (len(self.Queue[self.name]) <= self.buffer_size)) and len(self.Queue[self.name]) < self.channel.buffer_controller* self.buffer_size and self.getMaxLatencyFromBuffer(self.Queue[self.name]) < self.channel.latency_threshold:
             self.Queue[self.name].append(self.generate_new_frame())
+        elif len(self.Queue[self.name]) >= self.channel.buffer_controller * self.buffer_size or self.getMaxLatencyFromBuffer(self.Queue[self.name]) >= self.channel.latency_threshold:
+            self.channel.rejected_admissions_wifi +=1
+            if self.getTypeFromStation() == "vd":
+                self.channel.rejected_admissions_vd +=1
+            if self.getTypeFromStation() == "bg":
+                self.channel.rejected_admissions_bg +=1
+            if self.getTypeFromStation() == "be":
+                self.channel.rejected_admissions_be +=1
+            if self.getTypeFromStation() == "vc":
+                self.channel.rejected_admissions_vc += 1
         self.env.process(self.wait_for_frame(self.sumTime))
 
     def start(self):
@@ -151,7 +168,6 @@ class Station:
                     self.Queue[self.name].pop(0)
                 else:
                     self.frame_to_send = self.generate_new_frame()
-
                 was_sent = False
 
                 while not was_sent:
@@ -413,6 +429,12 @@ class Gnb:
         self.poisson_lambda = poisson_lambda
         self.Queue = Queue
 
+    def getMaxLatencyFromBuffer(self,Queue):
+        tempTime=0
+        for i in Queue:
+            if (self.env.now-i.t_start) > tempTime:
+                tempTime = self.env.now-i.t_start
+        return tempTime/1000000
 
     def wait_for_frame(self,time_to_wait):
         yield self.env.timeout(time_to_wait)
@@ -420,15 +442,23 @@ class Gnb:
 
     def start_generating(self):
         self.sumTime = numpy.random.exponential(1 / self.poisson_lambda) * 1000
-        if self.buffer_size is None or len(self.Queue[self.name]) <= self.buffer_size:
+        if (self.buffer_size is None or len(self.Queue[self.name]) <= self.buffer_size) and len(self.Queue[self.name]) < self.channel.buffer_controller * self.buffer_size and self.getMaxLatencyFromBuffer(self.Queue[self.name]) < self.channel.latency_threshold:
             self.Queue[self.name].append(self.gen_new_transmission())
-            #self.transmission_to_send=self.gen_new_transmission()
+        elif len(self.Queue[self.name]) >= self.channel.buffer_controller * self.buffer_size or self.getMaxLatencyFromBuffer(self.Queue[self.name]) >= self.channel.latency_threshold:
+            self.channel.rejected_admissions_nr += 1
+            if self.getTypeFromgNb() == "c1":
+                self.channel.rejected_admissions_c1 += 1
+            if self.getTypeFromgNb() == "c2":
+                self.channel.rejected_admissions_c2 += 1
+            if self.getTypeFromgNb() == "c3":
+                self.channel.rejected_admissions_c3 += 1
+            if self.getTypeFromgNb() == "c4":
+                self.channel.rejected_admissions_c4 += 1
         self.env.process(self.wait_for_frame(self.sumTime))
 
     def start(self):
         if self.poisson_lambda is not None:
             self.start_generating()
-           
 
         while True:
             if len(self.Queue[self.name]) > 0 or self.poisson_lambda is None:
@@ -811,6 +841,22 @@ class Channel:
     failed_transmissions_vd: int = 0
     failed_transmissions_vc: int = 0
 
+    rejected_admissions_wifi: int = 0
+    rejected_admissions_bg: int = 0
+    rejected_admissions_be: int = 0
+    rejected_admissions_vd: int = 0
+    rejected_admissions_vc: int = 0
+
+    rejected_admissions_nr: int = 0
+    rejected_admissions_c1: int = 0
+    rejected_admissions_c2: int = 0
+    rejected_admissions_c3: int = 0
+    rejected_admissions_c4: int = 0
+
+    latency_threshold: int = 5
+    buffer_controller: int = 1
+
+
 @dataclass()
 class Frame:
     frame_time: int  # time of the frame
@@ -888,6 +934,8 @@ def run_simulation(
         nMPDU,
         nSS,
         buffer_size,
+        latency_threshold,
+        buffer_controller,
 ):
     random.seed(seed)
     environment = simpy.Environment()
@@ -901,12 +949,13 @@ def run_simulation(
         airtime_data,
         airtime_control,
         airtime_data_NR,
-        airtime_control_NR
+        airtime_control_NR,
+        latency_threshold=latency_threshold,
+        buffer_controller=buffer_controller
     )
 
     global RTS_global_flag
     RTS_global_flag = True
-    print()
     standard = wifi_standard
     transtime = transtime
     nAMPDU  = nMPDU
@@ -1027,22 +1076,22 @@ def run_simulation(
     thrpt_c4 = (channel.succeeded_transmissions_c4 * 8) / (simulation_time * 1000000)
 
     # Wi-Fi PLR calculation
-    wifi_plr = channel.failed_transmissions / (channel.succeeded_transmissions+channel.failed_transmissions+1)
+    wifi_plr = (channel.failed_transmissions+channel.rejected_admissions_wifi) / (channel.succeeded_transmissions+channel.failed_transmissions+channel.rejected_admissions_wifi+1)
 
     # EDCA PLR calculation
-    be_plr = channel.failed_transmissions_be / (channel.succeeded_transmissions_be+channel.failed_transmissions_be+1)
-    bg_plr = channel.failed_transmissions_bg / (channel.succeeded_transmissions_bg+channel.failed_transmissions_bg+1)
-    vd_plr = channel.failed_transmissions_vd / (channel.succeeded_transmissions_vd+channel.failed_transmissions_vd+1)
-    vo_plr = channel.failed_transmissions_vc / (channel.succeeded_transmissions_vc+channel.failed_transmissions_vc+1)
+    be_plr = (channel.failed_transmissions_be+channel.rejected_admissions_be) / (channel.succeeded_transmissions_be+channel.failed_transmissions_be+channel.rejected_admissions_be+1)
+    bg_plr = (channel.failed_transmissions_bg+channel.rejected_admissions_bg) / (channel.succeeded_transmissions_bg+channel.failed_transmissions_bg+channel.rejected_admissions_bg+1)
+    vd_plr = (channel.failed_transmissions_vd+channel.rejected_admissions_vd) / (channel.succeeded_transmissions_vd+channel.failed_transmissions_vd+channel.rejected_admissions_vd+1)
+    vo_plr = (channel.failed_transmissions_vc+channel.rejected_admissions_vc) / (channel.succeeded_transmissions_vc+channel.failed_transmissions_vc+channel.rejected_admissions_vc+1)
 
     # NR-U PLR calculation
-    nr_plr = channel.failed_transmissions_NR / (channel.succeeded_transmissions_NR+channel.failed_transmissions_NR+1)
+    nr_plr = (channel.failed_transmissions_NR + channel.rejected_admissions_nr)  / (channel.succeeded_transmissions_NR+channel.failed_transmissions_NR+channel.rejected_admissions_nr+1)
 
     # NR-U categories PLR calculation
-    c1_plr = channel.failed_transmissions_c1 / (channel.succeeded_transmissions_c1+channel.failed_transmissions_c1+1)
-    c2_plr = channel.failed_transmissions_c2 / (channel.succeeded_transmissions_c2+channel.failed_transmissions_c2+1)
-    c3_plr = channel.failed_transmissions_c3 / (channel.succeeded_transmissions_c3+channel.failed_transmissions_c3+1)
-    c4_plr = channel.failed_transmissions_c4 / (channel.succeeded_transmissions_c4+channel.failed_transmissions_c4+1)
+    c1_plr = (channel.failed_transmissions_c1+channel.rejected_admissions_c1) / (channel.succeeded_transmissions_c1+channel.failed_transmissions_c1+channel.rejected_admissions_c1+1)
+    c2_plr = (channel.failed_transmissions_c2+channel.rejected_admissions_c2) / (channel.succeeded_transmissions_c2+channel.failed_transmissions_c2+channel.rejected_admissions_c2+1)
+    c3_plr = (channel.failed_transmissions_c3+channel.rejected_admissions_c3) / (channel.succeeded_transmissions_c3+channel.failed_transmissions_c3+channel.rejected_admissions_c3+1)
+    c4_plr = (channel.failed_transmissions_c4+channel.rejected_admissions_c4) / (channel.succeeded_transmissions_c4+channel.failed_transmissions_c4+channel.rejected_admissions_c4+1)
 
     # Jain's fairness index calculation
     jain_dict = airtime_data

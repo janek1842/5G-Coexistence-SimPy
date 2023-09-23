@@ -19,6 +19,8 @@ def single_run(
         nAMPDUs,
         nSS,
         buffer_size,
+        latency_threshold,
+        buffer_controller
 ):
 
     backoffs = {key: {sum(stations_number.values()): 0} for key in range(cw_max + 1)}
@@ -48,7 +50,7 @@ def single_run(
                    Config_NR(deter_period=16, observation_slot_duration=9, synchronization_slot_duration=sync,
                              max_sync_slot_desync=1000, min_sync_slot_desync=0, M=3, cw_min=cw_min, cw_max=cw_max,retry_limit=r_limit,mcot=6),
                    backoffs, airtime_data, airtime_control, airtime_data_NR, airtime_control_NR,poisson_lambda,transtime=transtime,
-                   Queue=Queue,distribution_k=distribution_k,RTS_threshold=RTS_threshold,wifi_standard=wifi_standard,nMPDU=nAMPDUs,nSS=nSS,buffer_size=buffer_size)
+                   Queue=Queue,distribution_k=distribution_k,RTS_threshold=RTS_threshold,wifi_standard=wifi_standard,nMPDU=nAMPDUs,nSS=nSS,buffer_size=buffer_size,latency_threshold=latency_threshold,buffer_controller=buffer_controller)
 
 if __name__ == "__main__":
 
@@ -68,16 +70,16 @@ if __name__ == "__main__":
             # WiFi EDCA categories
             stationsConfig = {
                 "backgroundStations": 0,
-                "bestEffortStations": 1,
+                "bestEffortStations": 4,
                 "videoStations": 0,
-                "voiceStations": 1
+                "voiceStations": 0
             }
 
             # NR-U categories
             gNBsConfig = {
-                "class_1": 1,
+                "class_1": 0,
                 "class_2": 0,
-                "class_3": 1,
+                "class_3": 4,
                 "class_4": 0
             }
 
@@ -85,7 +87,7 @@ if __name__ == "__main__":
             single_run(seeds=var,
                        stations_number=stationsConfig,
                        gnb_number=gNBsConfig,
-                       simulation_time=10,
+                       simulation_time=100,
                        payload_size=1500,
                        cw_min=15,
                        cw_max=1023,
@@ -99,5 +101,7 @@ if __name__ == "__main__":
                        wifi_standard = "802.11a", # 802.11ac or 802.11a
                        nAMPDUs = 1,
                        nSS = 1,
-                       buffer_size = 1000
+                       buffer_size = 10000,
+                       latency_threshold = 5000,
+                       buffer_controller = 1
                        )
