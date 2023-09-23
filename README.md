@@ -6,6 +6,10 @@ This is 5G-Coex-SimPy discrete-event simulator based on the SimPy Python library
 
 ### Engineer's (BSc) Thesis 
 
+```
+Validation and Extension of a WiFi and NR-U Coexistence Channel Access Simulator based on the Python SimPy Library
+```
+
 My Bachelor thesis was focused on the research and validation of existing functionalities as well as extending it with the following features:
 
 - EDCA
@@ -16,6 +20,11 @@ My Bachelor thesis was focused on the research and validation of existing functi
 - 802.11ac
 
 ### Master's (MSc) Thesis
+
+```
+Simulation Analysis of QoS in Wi-Fi and NR-U Network Coexistence
+Scenarios
+```
 
 My Master thesis is focused on the Quality of Service aspects of the above mentioned technologies coexisting in the same band. So far, I have managed to enrich the simulator with the following functionalities:
 
