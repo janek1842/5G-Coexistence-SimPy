@@ -19,8 +19,9 @@ def single_run(
         nAMPDUs,
         nSS,
         buffer_size,
-        latency_threshold,
-        buffer_controller
+        buffer_controller,
+        latency_entry_thresholds,
+        latency_exit_thresholds
 ):
 
     backoffs = {key: {sum(stations_number.values()): 0} for key in range(cw_max + 1)}
@@ -50,37 +51,62 @@ def single_run(
                    Config_NR(deter_period=16, observation_slot_duration=9, synchronization_slot_duration=sync,
                              max_sync_slot_desync=1000, min_sync_slot_desync=0, M=3, cw_min=cw_min, cw_max=cw_max,retry_limit=r_limit,mcot=6),
                    backoffs, airtime_data, airtime_control, airtime_data_NR, airtime_control_NR,poisson_lambda,transtime=transtime,
-                   Queue=Queue,distribution_k=distribution_k,RTS_threshold=RTS_threshold,wifi_standard=wifi_standard,nMPDU=nAMPDUs,nSS=nSS,buffer_size=buffer_size,latency_threshold=latency_threshold,buffer_controller=buffer_controller)
+                   Queue=Queue,distribution_k=distribution_k,RTS_threshold=RTS_threshold,wifi_standard=wifi_standard,nMPDU=nAMPDUs,nSS=nSS,buffer_size=buffer_size
+                   ,buffer_controller=buffer_controller,latency_entry_thresholds=latency_entry_thresholds,latency_exit_thresholds=latency_exit_thresholds)
 
 if __name__ == "__main__":
 
     #Performing multiple runs
     list = []
-    for radn in range(1,500):
+    for radn in range(1,101):
         n = random.randint(10, 1000)
         list.append(n)
 
     print("SEEDS: ",list)
 
-    # sync available values: 9, 18, 36, 63, 125, 250, 500, or 1000 [μs]
+    # sync slot available values: 9, 18, 36, 63, 125, 250, 500, or 1000 [μs]
 
     for var in list:
-        for i in [0.005,0.01,0.02,0.04,0.06,0.08,0.1,0.12,0.14,0.16,0.18,0.2]:
+        for i in [0.01,0.02,0.03,0.04,0.05,0.06,0.07,0.08,0.09,0.1]:
 
-            # WiFi EDCA categories
+            # WiFi EDCA categories - configuration of stations participating in simulation
             stationsConfig = {
-                "backgroundStations": 0,
-                "bestEffortStations": 4,
-                "videoStations": 0,
+                "backgroundStations": 1,
+                "bestEffortStations": 0,
+                "videoStations": 1,
                 "voiceStations": 0
             }
 
-            # NR-U categories
+            # NR-U categories - configuration of gNodeBs participating in simulation
             gNBsConfig = {
-                "class_1": 0,
-                "class_2": 0,
-                "class_3": 4,
-                "class_4": 0
+                "class_4": 1,
+                "class_3": 0,
+                "class_2": 1,
+                "class_1": 0
+            }
+
+            # Latency thresholds defined per Wi-Fi/NR-U Access Category. This value is validated if any packet's latency in Queue exceeds this value
+            latency_entry_thresholds = {
+                "be": 10000000000000,
+                "bk": 10000000000000,
+                "vi": 10000000000000,
+                "vo": 10000000000000,
+                "c1": 10000000000000,
+                "c2": 10000000000000,
+                "c3": 10000000000000,
+                "c4": 10000000000000,
+            }
+
+            # Latency thresholds defined per Wi-Fi/NR-U Access Category. This value is validated if packet to be transmitted is already delayed over this threshold
+            latency_exit_thresholds = {
+                "be": 1,
+                "bk": 1,
+                "vi": 1,
+                "vo": 1,
+                "c1": 1,
+                "c2": 1,
+                "c3": 1,
+                "c4": 1,
             }
 
             # for j in [1,10,20,30]:
@@ -91,17 +117,18 @@ if __name__ == "__main__":
                        payload_size=1500,
                        cw_min=15,
                        cw_max=1023,
-                       r_limit=7,
+                       r_limit=4,
                        mcs_value=7,
                        poisson_lambda=i,
-                       sync=500,
-                       transtime=5400,
+                       sync=250,
+                       transtime=5600,
                        distribution_k = None,
                        RTS_threshold = 9000000000,
                        wifi_standard = "802.11a", # 802.11ac or 802.11a
                        nAMPDUs = 1,
                        nSS = 1,
-                       buffer_size = 10000,
-                       latency_threshold = 5000,
-                       buffer_controller = 1
+                       buffer_size = 1000,
+                       buffer_controller=1,
+                       latency_entry_thresholds = latency_entry_thresholds,
+                       latency_exit_thresholds = latency_exit_thresholds
                        )

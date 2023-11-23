@@ -43,7 +43,7 @@ class Times:
     _overhead = 22  # [b]
 
 
-    def __init__(self, payload: int = 1472, mcs: int = 7, aifsn: int = 3,standard: string = "0",nss: int=3):
+    def __init__(self, payload: int = 1472, mcs: int = 7, aifsn: int = 3,standard: string = "802.11a",nss: int=1):
         self.payload = payload
         self.mcs = mcs
         self.nss = nss

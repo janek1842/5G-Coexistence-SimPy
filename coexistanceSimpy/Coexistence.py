@@ -17,14 +17,12 @@ from .Times import *
 from datetime import datetime
 from collections import defaultdict
 
-output_csv = "csvresults/V6/testLevel.csv"
+output_csv = "csvresults/MSC/thr/after/after2.csv"
 file_log_name = f"{datetime.today().strftime('%Y-%m-%d-%H-%M-%S')}.log"
-
 typ_filename = "RS_coex_1sta_1wifi2.log"
 
-RTS_global_flag = False
+RTS_global_flag = True
 RTS_transmitter = ""
-
 logging.basicConfig(filename="",format='%(asctime)s %(message)s',filemode='w')
 
 logger = logging.getLogger()
@@ -42,7 +40,6 @@ colors = [
 ]  # colors to distinguish stations in output
 
 big_num = 100000  # some big number for quesing in peeemtive resources - big starting point
-
 gap = True
 
 class Channel_occupied(Exception):
@@ -105,7 +102,7 @@ class Station:
         self.backoffs = backoffs
         self.transtime = transtime
         self.config = config
-        self.times = Times(config.data_size, config.mcs,config.aifsn,config.standard,self.config.nSS)  # using Times script to get time calculations
+        self.times = Times(config.data_size, config.mcs,3,config.standard,self.config.nSS)  # using Times script to get time calculations
         self.name = name  # name of the station
         self.env = env  # simpy environment
         self.col = random.choice(colors)  # color of output -- for future station distinction
@@ -136,24 +133,38 @@ class Station:
                 tempTime = self.env.now-i.t_start
         return tempTime/1000000
 
+    def checkIfFrameExceedThreshold(self,Frame):
+        current_latency = (self.env.now - Frame.t_start)/1000000
+        if self.channel.latency_exit_thresholds[self.getTypeFromStation()] >= current_latency:
+            return False
+        else:
+            return True
+
     def wait_for_frame(self,time_to_wait):
         yield self.env.timeout(time_to_wait)
         self.start_generating()
 
+
     def start_generating(self):
         self.sumTime = numpy.random.exponential(1 / self.poisson_lambda) * 1000
-        if (self.buffer_size is None or (len(self.Queue[self.name]) <= self.buffer_size)) and len(self.Queue[self.name]) < self.channel.buffer_controller* self.buffer_size and self.getMaxLatencyFromBuffer(self.Queue[self.name]) < self.channel.latency_threshold:
+        if (self.buffer_size is None or (len(self.Queue[self.name]) < self.buffer_size)) and len(self.Queue[self.name]) < self.channel.buffer_controller* self.buffer_size and \
+                self.getMaxLatencyFromBuffer(self.Queue[self.name]) < self.channel.latency_entry_thresholds[self.getTypeFromStation()]:
+
             self.Queue[self.name].append(self.generate_new_frame())
-        elif len(self.Queue[self.name]) >= self.channel.buffer_controller * self.buffer_size or self.getMaxLatencyFromBuffer(self.Queue[self.name]) >= self.channel.latency_threshold:
+
+        elif len(self.Queue[self.name]) >= self.channel.buffer_controller * self.buffer_size or self.getMaxLatencyFromBuffer(self.Queue[self.name]) >= self.channel.latency_entry_thresholds[self.getTypeFromStation()]:
+
             self.channel.rejected_admissions_wifi +=1
-            if self.getTypeFromStation() == "vd":
-                self.channel.rejected_admissions_vd +=1
-            if self.getTypeFromStation() == "bg":
-                self.channel.rejected_admissions_bg +=1
+
+            if self.getTypeFromStation() == "vi":
+                self.channel.rejected_admissions_vi +=1
+            if self.getTypeFromStation() == "bk":
+                self.channel.rejected_admissions_bk +=1
             if self.getTypeFromStation() == "be":
                 self.channel.rejected_admissions_be +=1
-            if self.getTypeFromStation() == "vc":
-                self.channel.rejected_admissions_vc += 1
+            if self.getTypeFromStation() == "vo":
+                self.channel.rejected_admissions_vo += 1
+
         self.env.process(self.wait_for_frame(self.sumTime))
 
     def start(self):
@@ -162,16 +173,36 @@ class Station:
         global RTS_global_flag
 
         while True:
+
             if len(self.Queue[self.name]) > 0 or self.poisson_lambda is None:
                 if self.poisson_lambda is not None:
-                    self.frame_to_send = self.Queue[self.name][0]
-                    self.Queue[self.name].pop(0)
+                    if not self.checkIfFrameExceedThreshold(self.Queue[self.name][0]):
+                        self.frame_to_send = self.Queue[self.name][0]
+                        self.Queue[self.name].pop(0)
                 else:
                     self.frame_to_send = self.generate_new_frame()
                 was_sent = False
 
                 while not was_sent:
-                    if self.frame_to_send is not None:
+
+                    if self.checkIfFrameExceedThreshold(self.frame_to_send):
+
+                        was_sent = True
+                        self.failed_transmissions_in_row = 0
+                        self.channel.rejected_admissions_wifi += 1
+
+                        if self.getTypeFromStation() == "vi":
+                            self.channel.rejected_admissions_vi += 1
+                        if self.getTypeFromStation() == "bk":
+                            self.channel.rejected_admissions_bk += 1
+                        if self.getTypeFromStation() == "be":
+                            self.channel.rejected_admissions_be += 1
+                        if self.getTypeFromStation() == "vo":
+                            self.channel.rejected_admissions_vo += 1
+
+                        self.env.step()
+
+                    elif self.frame_to_send is not None:
                         self.process = self.env.process(self.wait_back_off())
                         yield self.process
 
@@ -185,7 +216,8 @@ class Station:
                             was_sent = yield self.env.process(self.send_frame())
 
             elif bool([a for a in self.Queue.values() if a == []]):
-                yield self.env.timeout(1000)
+                #yield self.env.timeout(1000)
+                self.env.step()
             else:
                 #yield self.env.timeout(1000)
                 self.env.step()
@@ -199,7 +231,7 @@ class Station:
             try:
                 with self.channel.tx_lock.request() as req:  # waiting  for idle channel -- empty channel
                     yield req
-                self.back_off_time += Times.t_difs  # add DIFS time
+                self.back_off_time += self.times.t_difs  # add DIFS time
                 log(self, f"Starting to wait backoff (with DIFS): ({self.back_off_time})u...")
                 self.first_interrupt = True
                 self.start = self.env.now  # store the current simulation time
@@ -217,18 +249,18 @@ class Station:
                     # tak jest po mojemu:
                     log(self, "Waiting was interrupted, waiting to resume backoff...")
                     all_waited = self.env.now - self.start
-                    if all_waited <= Times.t_difs:
-                        self.back_off_time -= Times.t_difs
+                    if all_waited <= self.times.t_difs:
+                        self.back_off_time -= self.times.t_difs
                         log(self,
-                            f"Interupted in DIFS ({Times.t_difs}), backoff {self.back_off_time}, already waited: {all_waited}")
+                            f"Interupted in DIFS ({self.times.t_difs}), backoff {self.back_off_time}, already waited: {all_waited}")
                     else:
-                        back_waited = all_waited - Times.t_difs
-                        slot_waited = int(back_waited / Times.t_slot)
-                        self.back_off_time -= ((slot_waited * Times.t_slot) + Times.t_difs)
+                        back_waited = all_waited - self.times.t_difs
+                        slot_waited = int(back_waited / self.times.t_slot)
+                        self.back_off_time -= ((slot_waited * self.times.t_slot) + self.times.t_difs)
                         log(self,
-                            f"Completed slots(9us) {slot_waited} = {(slot_waited * Times.t_slot)}  plus DIFS time {Times.t_difs}")
+                            f"Completed slots(9us) {slot_waited} = {(slot_waited * self.times.t_slot)}  plus DIFS time {self.times.t_difs}")
                         log(self,
-                            f"Backoff decresed by {((slot_waited * Times.t_slot) + Times.t_difs)} new Backoff {self.back_off_time}")
+                            f"Backoff decresed by {((slot_waited * self.times.t_slot) + self.times.t_difs)} new Backoff {self.back_off_time}")
                     self.first_interrupt = False
 
     def send_frame(self):
@@ -285,7 +317,7 @@ class Station:
             yield self.env.timeout(self.times.get_ack_frame_time())  # wait ack
         else:
             log(self, "waiting ack timeout slave")
-            yield self.env.timeout(Times.ack_timeout)  # simulate ack timeout after failed transmission
+            yield self.env.timeout(self.times.ack_timeout)  # simulate ack timeout after failed transmission
         return was_sent
 
     def check_collision(self):  # check if the collision occurred
@@ -318,13 +350,13 @@ class Station:
         self.channel.failed_transmissions += 1
 
         if self.config.cw_min == 15 and self.config.cw_max == 1023 and self.config.aifsn==7:
-            self.channel.failed_transmissions_bg += 1
+            self.channel.failed_transmissions_bk += 1
         elif self.config.cw_min == 15 and self.config.cw_max == 1023 and self.config.aifsn == 3:
             self.channel.failed_transmissions_be += 1
         elif self.config.cw_min == 7 and self.config.cw_max == 15 and self.config.aifsn == 2:
-            self.channel.failed_transmissions_vd += 1
+            self.channel.failed_transmissions_vi += 1
         elif self.config.cw_min == 3 and self.config.cw_max == 7 and self.config.aifsn == 2:
-            self.channel.failed_transmissions_vc += 1
+            self.channel.failed_transmissions_vo += 1
 
         self.failed_transmissions += 1
         self.failed_transmissions_in_row += 1
@@ -337,11 +369,11 @@ class Station:
 
     def getTypeFromStation(self):
         if self.config.cw_min == 15 and self.config.cw_max == 1023 and self.config.aifsn == 7:
-            return "bg"
+            return "bk"
         elif self.config.cw_min == 15 and self.config.cw_max == 1023 and self.config.aifsn == 3:
             return "be"
         elif self.config.cw_min == 7 and self.config.cw_max == 15 and self.config.aifsn == 2:
-            return "vd"
+            return "vi"
         elif self.config.cw_min == 3 and self.config.cw_max == 7 and self.config.aifsn == 2:
             return "vo"
 
@@ -364,19 +396,18 @@ class Station:
         self.channel.succeeded_transmissions += 1
 
         if self.config.cw_min == 15 and self.config.cw_max == 1023 and self.config.aifsn==7:
-            self.channel.succeeded_transmissions_bg += 1
-            self.channel.latency_bg.append(self.frame_to_send.t_to_send)
+            self.channel.succeeded_transmissions_bk += 1
+            self.channel.latency_bk.append(self.frame_to_send.t_to_send)
         elif self.config.cw_min == 15 and self.config.cw_max == 1023 and self.config.aifsn == 3:
             self.channel.succeeded_transmissions_be += 1
             self.channel.latency_be.append(self.frame_to_send.t_to_send)
         elif self.config.cw_min == 7 and self.config.cw_max == 15 and self.config.aifsn == 2:
-            self.channel.succeeded_transmissions_vd += 1
-            self.channel.latency_vd.append(self.frame_to_send.t_to_send)
+            self.channel.succeeded_transmissions_vi += 1
+            self.channel.latency_vi.append(self.frame_to_send.t_to_send)
         elif self.config.cw_min == 3 and self.config.cw_max == 7 and self.config.aifsn == 2:
-            self.channel.succeeded_transmissions_vc += 1
-            self.channel.latency_vc.append(self.frame_to_send.t_to_send)
+            self.channel.succeeded_transmissions_vo += 1
+            self.channel.latency_vo.append(self.frame_to_send.t_to_send)
 
-        self.succeeded_transmissions += 1
         self.failed_transmissions_in_row = 0
         self.channel.bytes_sent += self.frame_to_send.data_size
         self.channel.airtime_data[self.name] += self.frame_to_send.frame_time
@@ -406,12 +437,10 @@ class Gnb:
         self.succeeded_transmissions = 0  # all succeeded transmissions for station
         self.failed_transmissions = 0  # all failed transmissions for station
         self.failed_transmissions_in_row = 0  # all failed transmissions for station in a row
-
         self.cw_min = config_nr.cw_min  # cw min parameter value
         self.N = None  # backoff counter
         self.desync = 0
         self.next_sync_slot_boundry = 0
-
         self.cw_max = self.config_nr.cw_max  # cw max parameter value
         self.channel = channel  # channel objfirst_transmission
         env.process(self.start())  # starting simulation process
@@ -436,15 +465,24 @@ class Gnb:
                 tempTime = self.env.now-i.t_start
         return tempTime/1000000
 
+    def checkIfTransmissionExceedThreshold(self,Transmission):
+        current_latency = (self.env.now - Transmission.t_start)/1000000
+        if self.channel.latency_exit_thresholds[self.getTypeFromgNb()] >= current_latency:
+            return False
+        else:
+            return True
+
     def wait_for_frame(self,time_to_wait):
         yield self.env.timeout(time_to_wait)
         self.start_generating()
 
     def start_generating(self):
         self.sumTime = numpy.random.exponential(1 / self.poisson_lambda) * 1000
-        if (self.buffer_size is None or len(self.Queue[self.name]) <= self.buffer_size) and len(self.Queue[self.name]) < self.channel.buffer_controller * self.buffer_size and self.getMaxLatencyFromBuffer(self.Queue[self.name]) < self.channel.latency_threshold:
+        if (self.buffer_size is None or (len(self.Queue[self.name]) < self.buffer_size)) and len(self.Queue[self.name]) < self.channel.buffer_controller * self.buffer_size and \
+                self.getMaxLatencyFromBuffer(self.Queue[self.name]) < self.channel.latency_entry_thresholds[self.getTypeFromgNb()]:
             self.Queue[self.name].append(self.gen_new_transmission())
-        elif len(self.Queue[self.name]) >= self.channel.buffer_controller * self.buffer_size or self.getMaxLatencyFromBuffer(self.Queue[self.name]) >= self.channel.latency_threshold:
+        elif len(self.Queue[self.name]) >= self.channel.buffer_controller * self.buffer_size or \
+                self.getMaxLatencyFromBuffer(self.Queue[self.name]) >= self.channel.latency_entry_thresholds[self.getTypeFromgNb()]:
             self.channel.rejected_admissions_nr += 1
             if self.getTypeFromgNb() == "c1":
                 self.channel.rejected_admissions_c1 += 1
@@ -463,8 +501,9 @@ class Gnb:
         while True:
             if len(self.Queue[self.name]) > 0 or self.poisson_lambda is None:
                 if self.poisson_lambda is not None:
-                    self.transmission_to_send = self.Queue[self.name][0]
-                    self.Queue[self.name].pop(0)
+                    if not self.checkIfTransmissionExceedThreshold(self.Queue[self.name][0]):
+                        self.transmission_to_send = self.Queue[self.name][0]
+                        self.Queue[self.name].pop(0)
                 else:
                     self.transmission_to_send=self.gen_new_transmission()
 
@@ -472,22 +511,43 @@ class Gnb:
 
                 while not was_sent:
 
-                    if gap:
-                        self.process = self.env.process(self.wait_back_off_gap())
-                        yield self.process
-                        was_sent = yield self.env.process(self.send_transmission())
-                    else:
-                        self.process = self.env.process(self.wait_back_off())
-                        yield self.process
-                        was_sent = yield self.env.process(self.send_transmission())
+                    if self.checkIfTransmissionExceedThreshold(self.transmission_to_send):
+
+                        was_sent = True
+                        self.failed_transmissions_in_row = 0
+                        self.channel.rejected_admissions_nr += 1
+                        if self.getTypeFromgNb() == "c1":
+                            self.channel.rejected_admissions_c1 += 1
+                        if self.getTypeFromgNb() == "c2":
+                            self.channel.rejected_admissions_c2 += 1
+                        if self.getTypeFromgNb() == "c3":
+                            self.channel.rejected_admissions_c3 += 1
+                        if self.getTypeFromgNb() == "c4":
+                            self.channel.rejected_admissions_c4 += 1
+                        self.env.step()
+
+                    elif self.transmission_to_send is not None:
+                        if gap:
+                            self.process = self.env.process(self.wait_back_off_gap())
+                            yield self.process
+                            was_sent = yield self.env.process(self.send_transmission())
+                        else:
+                            self.process = self.env.process(self.wait_back_off())
+                            yield self.process
+                            was_sent = yield self.env.process(self.send_transmission())
 
             elif bool([a for a in self.Queue.values() if a == []]):
+                #yield self.env.timeout(1000)
+                self.env.step()
+            else:
+                #yield self.env.timeout(1000)
                 self.env.step()
 
     def wait_back_off_gap(self):
         self.back_off_time = self.generate_new_back_off_time(self.failed_transmissions_in_row)
         # adding pp to the backoff timer
-        m = self.config_nr.M
+        #m = self.config_nr.M
+        m=3
         prioritization_period_time = self.config_nr.deter_period + m * self.config_nr.observation_slot_duration
         self.back_off_time += prioritization_period_time  # add Priritization Period time to bacoff procedure
 
@@ -699,7 +759,7 @@ class Gnb:
                 return True
 
     def gen_new_transmission(self):
-        transmission_time = self.transtime   # transforming to usec
+        transmission_time = self.transtime  # transforming to usec
         if gap:
             rs_time = 0
         else:
@@ -735,7 +795,7 @@ class Gnb:
         elif self.config_nr.cw_min == 3 and self.config_nr.cw_max == 7 and self.config_nr.M == 1:
             self.channel.failed_transmissions_c1 += 1
 
-        if self.transmission_to_send.number_of_retransmissions > self.config_nr.retry_limit:
+        if self.transmission_to_send.number_of_retransmissions > self.config_nr.retry_limit or self.checkIfTransmissionExceedThreshold(self.transmission_to_send):
             self.failed_transmissions_in_row = 0
 
     def getTypeFromgNb(self):
@@ -790,6 +850,9 @@ class Channel:
     airtime_data_NR: Dict[str, int]
     airtime_control_NR: Dict[str, int]
 
+    latency_entry_thresholds: Dict[str, float]
+    latency_exit_thresholds: Dict[str, float]
+
     tx_list: List[Station] = field(default_factory=list)  # transmitting stations in the channel
     back_off_list: List[Station] = field(default_factory=list)  # stations in backoff phase
     tx_list_NR: List[Gnb] = field(default_factory=list)  # transmitting stations in the channel
@@ -801,9 +864,9 @@ class Channel:
     # Stats for individual categories
 
     succeeded_transmissions_be: float = 0
-    succeeded_transmissions_bg: float = 0
-    succeeded_transmissions_vc: float = 0
-    succeeded_transmissions_vd: float = 0
+    succeeded_transmissions_bk: float = 0
+    succeeded_transmissions_vo: float = 0
+    succeeded_transmissions_vi: float = 0
 
     succeeded_transmissions_c1: float = 0
     succeeded_transmissions_c2: float = 0
@@ -814,9 +877,9 @@ class Channel:
     latency_nru: List[complex] = field(default_factory=list)
 
     latency_be: List[complex] = field(default_factory=list)
-    latency_bg: List[complex] = field(default_factory=list)
-    latency_vc: List[complex] = field(default_factory=list)
-    latency_vd: List[complex] = field(default_factory=list)
+    latency_bk: List[complex] = field(default_factory=list)
+    latency_vo: List[complex] = field(default_factory=list)
+    latency_vi: List[complex] = field(default_factory=list)
 
     latency_c1: List[complex] = field(default_factory=list)
     latency_c2: List[complex] = field(default_factory=list)
@@ -836,16 +899,16 @@ class Channel:
     failed_transmissions_c3: int = 0
     failed_transmissions_c4: int = 0
 
-    failed_transmissions_bg: int = 0
+    failed_transmissions_bk: int = 0
     failed_transmissions_be: int = 0
-    failed_transmissions_vd: int = 0
-    failed_transmissions_vc: int = 0
+    failed_transmissions_vi: int = 0
+    failed_transmissions_vo: int = 0
 
     rejected_admissions_wifi: int = 0
-    rejected_admissions_bg: int = 0
+    rejected_admissions_bk: int = 0
     rejected_admissions_be: int = 0
-    rejected_admissions_vd: int = 0
-    rejected_admissions_vc: int = 0
+    rejected_admissions_vi: int = 0
+    rejected_admissions_vo: int = 0
 
     rejected_admissions_nr: int = 0
     rejected_admissions_c1: int = 0
@@ -853,9 +916,7 @@ class Channel:
     rejected_admissions_c3: int = 0
     rejected_admissions_c4: int = 0
 
-    latency_threshold: int = 5
     buffer_controller: int = 1
-
 
 @dataclass()
 class Frame:
@@ -886,7 +947,6 @@ class Transmission_NR:
     t_to_send: int = None
     collided: bool = False  # true if transmission colided with another one
 
-
 def getWifiTimeCategories(number_of_stations,airtime_data,trafficType):
     airtime_values=list(airtime_data.values())
 
@@ -912,7 +972,6 @@ def getNruTimeCategories(number_of_stations,airtime_data,trafficType):
     elif trafficType == "class_4":
         return sum(airtime_values[number_of_stations["class_1"]+number_of_stations["class_2"]+number_of_stations["class_3"]:number_of_stations["class_1"]+number_of_stations["class_2"]+number_of_stations["class_3"]+number_of_stations["class_4"]])
 
-
 def run_simulation(
         number_of_stations: Dict[str,int],
         number_of_gnb: Dict[str,int],
@@ -934,8 +993,9 @@ def run_simulation(
         nMPDU,
         nSS,
         buffer_size,
-        latency_threshold,
         buffer_controller,
+        latency_entry_thresholds,
+        latency_exit_thresholds
 ):
     random.seed(seed)
     environment = simpy.Environment()
@@ -950,8 +1010,9 @@ def run_simulation(
         airtime_control,
         airtime_data_NR,
         airtime_control_NR,
-        latency_threshold=latency_threshold,
-        buffer_controller=buffer_controller
+        buffer_controller=buffer_controller,
+        latency_entry_thresholds=latency_entry_thresholds,
+        latency_exit_thresholds =latency_exit_thresholds
     )
 
     global RTS_global_flag
@@ -1029,8 +1090,7 @@ def run_simulation(
             p_coll = 0
     else:
         p_coll = 0
-    
-    
+
     if sum(number_of_gnb.values()) != 0:
         if (channel.failed_transmissions_NR + channel.succeeded_transmissions_NR) != 0:
             p_coll_NR = "{:.4f}".format(
@@ -1064,10 +1124,10 @@ def run_simulation(
     throughput=(channel.succeeded_transmissions * config.data_size * 8) / (simulation_time * 1000000)
 
     # EDCA throughput calculation
-    thrpt_vc = (channel.succeeded_transmissions_vc * config.data_size * 8) / (simulation_time * 1000000)
-    thrpt_vd = (channel.succeeded_transmissions_vd * config.data_size * 8) / (simulation_time * 1000000)
+    thrpt_vo = (channel.succeeded_transmissions_vo * config.data_size * 8) / (simulation_time * 1000000)
+    thrpt_vi = (channel.succeeded_transmissions_vi * config.data_size * 8) / (simulation_time * 1000000)
     thrpt_be = (channel.succeeded_transmissions_be * config.data_size * 8) / (simulation_time * 1000000)
-    thrpt_bg = (channel.succeeded_transmissions_bg * config.data_size * 8) / (simulation_time * 1000000)
+    thrpt_bk = (channel.succeeded_transmissions_bk * config.data_size * 8) / (simulation_time * 1000000)
 
     # NR-U categories throughput calculation (FOR FUTURE EXTENSION)
     thrpt_c1 = (channel.succeeded_transmissions_c1 * 8) / (simulation_time * 1000000)
@@ -1076,22 +1136,22 @@ def run_simulation(
     thrpt_c4 = (channel.succeeded_transmissions_c4 * 8) / (simulation_time * 1000000)
 
     # Wi-Fi PLR calculation
-    wifi_plr = (channel.failed_transmissions+channel.rejected_admissions_wifi) / (channel.succeeded_transmissions+channel.failed_transmissions+channel.rejected_admissions_wifi+1)
+    plr_wifi = (channel.failed_transmissions+channel.rejected_admissions_wifi) / (channel.succeeded_transmissions+channel.failed_transmissions+channel.rejected_admissions_wifi+1)
 
     # EDCA PLR calculation
-    be_plr = (channel.failed_transmissions_be+channel.rejected_admissions_be) / (channel.succeeded_transmissions_be+channel.failed_transmissions_be+channel.rejected_admissions_be+1)
-    bg_plr = (channel.failed_transmissions_bg+channel.rejected_admissions_bg) / (channel.succeeded_transmissions_bg+channel.failed_transmissions_bg+channel.rejected_admissions_bg+1)
-    vd_plr = (channel.failed_transmissions_vd+channel.rejected_admissions_vd) / (channel.succeeded_transmissions_vd+channel.failed_transmissions_vd+channel.rejected_admissions_vd+1)
-    vo_plr = (channel.failed_transmissions_vc+channel.rejected_admissions_vc) / (channel.succeeded_transmissions_vc+channel.failed_transmissions_vc+channel.rejected_admissions_vc+1)
+    plr_be = (channel.failed_transmissions_be+channel.rejected_admissions_be) / (channel.succeeded_transmissions_be+channel.failed_transmissions_be+channel.rejected_admissions_be+1)
+    plr_bk = (channel.failed_transmissions_bk+channel.rejected_admissions_bk) / (channel.succeeded_transmissions_bk+channel.failed_transmissions_bk+channel.rejected_admissions_bk+1)
+    plr_vi = (channel.failed_transmissions_vi+channel.rejected_admissions_vi) / (channel.succeeded_transmissions_vi+channel.failed_transmissions_vi+channel.rejected_admissions_vi+1)
+    plr_vo = (channel.failed_transmissions_vo+channel.rejected_admissions_vo) / (channel.succeeded_transmissions_vo+channel.failed_transmissions_vo+channel.rejected_admissions_vo+1)
 
     # NR-U PLR calculation
-    nr_plr = (channel.failed_transmissions_NR + channel.rejected_admissions_nr)  / (channel.succeeded_transmissions_NR+channel.failed_transmissions_NR+channel.rejected_admissions_nr+1)
+    plr_nr = (channel.failed_transmissions_NR + channel.rejected_admissions_nr)  / (channel.succeeded_transmissions_NR+channel.failed_transmissions_NR+channel.rejected_admissions_nr+1)
 
     # NR-U categories PLR calculation
-    c1_plr = (channel.failed_transmissions_c1+channel.rejected_admissions_c1) / (channel.succeeded_transmissions_c1+channel.failed_transmissions_c1+channel.rejected_admissions_c1+1)
-    c2_plr = (channel.failed_transmissions_c2+channel.rejected_admissions_c2) / (channel.succeeded_transmissions_c2+channel.failed_transmissions_c2+channel.rejected_admissions_c2+1)
-    c3_plr = (channel.failed_transmissions_c3+channel.rejected_admissions_c3) / (channel.succeeded_transmissions_c3+channel.failed_transmissions_c3+channel.rejected_admissions_c3+1)
-    c4_plr = (channel.failed_transmissions_c4+channel.rejected_admissions_c4) / (channel.succeeded_transmissions_c4+channel.failed_transmissions_c4+channel.rejected_admissions_c4+1)
+    plr_c1 = (channel.failed_transmissions_c1+channel.rejected_admissions_c1) / (channel.succeeded_transmissions_c1+channel.failed_transmissions_c1+channel.rejected_admissions_c1+1)
+    plr_c2 = (channel.failed_transmissions_c2+channel.rejected_admissions_c2) / (channel.succeeded_transmissions_c2+channel.failed_transmissions_c2+channel.rejected_admissions_c2+1)
+    plr_c3 = (channel.failed_transmissions_c3+channel.rejected_admissions_c3) / (channel.succeeded_transmissions_c3+channel.failed_transmissions_c3+channel.rejected_admissions_c3+1)
+    plr_c4 = (channel.failed_transmissions_c4+channel.rejected_admissions_c4) / (channel.succeeded_transmissions_c4+channel.failed_transmissions_c4+channel.rejected_admissions_c4+1)
 
     # Jain's fairness index calculation
     jain_dict = airtime_data
@@ -1102,94 +1162,126 @@ def run_simulation(
         jain_fair_index = 0
 
     # EDCA airtime calculation
-    beAirTime = getWifiTimeCategories(number_of_stations,airtime_data,"bestEffort") / (simulation_time * 1000000)
-    vdAirTime = getWifiTimeCategories(number_of_stations,airtime_data,"video") / (simulation_time * 1000000)
-    vcAirTime = getWifiTimeCategories(number_of_stations,airtime_data,"voice") / (simulation_time * 1000000)
-    bgAirTime = getWifiTimeCategories(number_of_stations,airtime_data,"background") / (simulation_time * 1000000)
+    airtime_be = getWifiTimeCategories(number_of_stations,airtime_data,"bestEffort") / (simulation_time * 1000000)
+    airtime_vi = getWifiTimeCategories(number_of_stations,airtime_data,"video") / (simulation_time * 1000000)
+    airtime_vo = getWifiTimeCategories(number_of_stations,airtime_data,"voice") / (simulation_time * 1000000)
+    airtime_bk = getWifiTimeCategories(number_of_stations,airtime_data,"background") / (simulation_time * 1000000)
 
     # NR-U airtime calculation
-    c1AirTime = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_1") / (simulation_time * 1000000)
-    c2AirTime = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_2") / (simulation_time * 1000000)
-    c3AirTime = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_3") / (simulation_time * 1000000)
-    c4AirTime = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_4") / (simulation_time * 1000000)
+    airtime_c1 = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_1") / (simulation_time * 1000000)
+    airtime_c2 = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_2") / (simulation_time * 1000000)
+    airtime_c3 = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_3") / (simulation_time * 1000000)
+    airtime_c4 = getNruTimeCategories(number_of_gnb, airtime_data_NR, "class_4") / (simulation_time * 1000000)
 
     # WiFi latency calculation
-    avg_latency_wifi = ((sum(channel.latency_wifi))/(len(channel.latency_wifi)+1))/ (1000000)
+    try:
+        avg_latency_wifi = ((sum(channel.latency_wifi))/(len(channel.latency_wifi)))/ (1000000)
+    except:
+        avg_latency_wifi=0
 
     # WiFi EDCA latency calculation
-    avg_latency_be = ((sum(channel.latency_be))   / (len(channel.latency_be)+1)) /  (1000000)
-    avg_latency_bg = ((sum(channel.latency_bg))   / (len(channel.latency_bg)+1)) /  (1000000)
-    avg_latency_vd = ((sum(channel.latency_vd))   / (len(channel.latency_vd)+1)) /  (1000000)
-    avg_latency_vc = ((sum(channel.latency_vc))   / (len(channel.latency_vc)+1)) /  (1000000)
+    try:
+        avg_latency_be = ((sum(channel.latency_be))   / (len(channel.latency_be))) /  (1000000)
+    except:
+        avg_latency_be=None
+
+    try:
+        avg_latency_bk = ((sum(channel.latency_bk))   / (len(channel.latency_bk))) /  (1000000)
+    except:
+        avg_latency_bk=None
+
+    try:
+        avg_latency_vi = ((sum(channel.latency_vi))   / (len(channel.latency_vi))) /  (1000000)
+    except:
+        avg_latency_vi=None
+
+    try:
+        avg_latency_vo = ((sum(channel.latency_vo))   / (len(channel.latency_vo))) /  (1000000)
+    except:
+        avg_latency_vo=None
 
     # NR-U latency calculation
     try:
         avg_latency_nru = (sum(channel.latency_nru)/(len(channel.latency_nru)))/ (1000000)
     except:
         avg_latency_nru = None
-    
-    
+
     # NR-U categories latency calculation
-    avg_latency_c1 = ((sum(channel.latency_c1)) / (len(channel.latency_c1) + 1)) / (1000000)
-    avg_latency_c2 = ((sum(channel.latency_c2)) / (len(channel.latency_c2) + 1)) / (1000000)
-    avg_latency_c3 = ((sum(channel.latency_c3)) / (len(channel.latency_c3) + 1)) / (1000000)
-    avg_latency_c4 = ((sum(channel.latency_c4)) / (len(channel.latency_c4) + 1)) / (1000000)
+    try:
+        avg_latency_c1 = ((sum(channel.latency_c1)) / (len(channel.latency_c1))) / (1000000)
+    except:
+        avg_latency_c1 = None
+
+    try:
+        avg_latency_c2 = ((sum(channel.latency_c2)) / (len(channel.latency_c2))) / (1000000)
+    except:
+        avg_latency_c2 = None
+
+    try:
+        avg_latency_c3 = ((sum(channel.latency_c3)) / (len(channel.latency_c3))) / (1000000)
+    except:
+        avg_latency_c3 = None
+
+    try:
+        avg_latency_c4 = ((sum(channel.latency_c4)) / (len(channel.latency_c4))) / (1000000)
+    except:
+        avg_latency_c4 = None
 
     # WiFi jitter calculation
-    jitter_wifi = numpy.var(channel.latency_wifi)/ (1000000)
+    jitter_wifi = numpy.var(channel.latency_wifi)/ (1000000*1000000)
 
     # EDCA jitter calculation
-    jitter_be = numpy.var(channel.latency_be)/ (1000000)
-    jitter_bg = numpy.var(channel.latency_bg)/ (1000000)
-    jitter_vd = numpy.var(channel.latency_vd)/ (1000000)
-    jitter_vc = numpy.var(channel.latency_vc)/ (1000000)
+    jitter_be = numpy.var(channel.latency_be)/ (1000000*1000000)
+    jitter_bk = numpy.var(channel.latency_bk)/ (1000000*1000000)
+    jitter_vi = numpy.var(channel.latency_vi)/ (1000000*1000000)
+    jitter_vo = numpy.var(channel.latency_vo)/ (1000000*1000000)
 
     # NR-U latency calculation
-    jitter_nru = numpy.var(channel.latency_nru)/ (1000000)
+    jitter_nru = numpy.var(channel.latency_nru)/ (1000000*1000000)
 
     # NR-U categories latency calculation
-    jitter_c1 = numpy.var(channel.latency_c1)/ (1000000)
-    jitter_c2 = numpy.var(channel.latency_c2)/ (1000000)
-    jitter_c3 = numpy.var(channel.latency_c3)/ (1000000)
-    jitter_c4 = numpy.var(channel.latency_c4)/ (1000000)
+    jitter_c1 = numpy.var(channel.latency_c1)/ (1000000*1000000)
+    jitter_c2 = numpy.var(channel.latency_c2)/ (1000000*1000000)
+    jitter_c3 = numpy.var(channel.latency_c3)/ (1000000*1000000)
+    jitter_c4 = numpy.var(channel.latency_c4)/ (1000000*1000000)
 
     # Printing results
     print("------------------------------------------------------------------------------------------")
-    print("")
-    print("THROUGHPUT")
-    print(" T_VC: ", thrpt_vc, " T_VD: ",thrpt_vd, " T_BE: ",thrpt_be, " T_BG: ",thrpt_bg)
-    print(" T_C1: ", thrpt_c1, " T_C2: ", thrpt_c2, " T_C3: ", thrpt_c3, " T_C4: ", thrpt_c4)
-    print("")
-    print("AIR TIME")
-    print(" BE: ",beAirTime," BG: ",bgAirTime," VD: ",vdAirTime," VC: ",vcAirTime)
-    print(" C1: ", c1AirTime, "C2: ", c2AirTime, "C3: ", c3AirTime, "C4: ", c4AirTime)
-    print("")
-    print("LATENCY")
-    print("WiFi: ", avg_latency_wifi)
-    print("BG: ",avg_latency_bg, "BE: ",avg_latency_be, "VD: ",avg_latency_vd, "VO: ",avg_latency_vc)
-    print("NR-U: ", avg_latency_nru)
-    print("C1: ", avg_latency_c1, "C2: ", avg_latency_c2, "C3: ", avg_latency_c3, "C4: ", avg_latency_c4)
-    print("")
-    print("JITTER")
-    print("WiFi: ", jitter_wifi)
-    print("BG: ", jitter_bg, "BE: ", jitter_be, "VD: ", jitter_vd, "VO: ", jitter_vc)
-    print("NR-U: ", jitter_nru)
-    print("C1: ", jitter_c1, "C2: ", jitter_c2, "C3: ", jitter_c3, "C4: ", jitter_c4)
-    print("")
-    print("Packet Loss Ratio")
-    print("WiFi: ", wifi_plr)
-    print("BG: ", bg_plr, "BE: ", be_plr, "VD: ", vd_plr, "VO: ", vo_plr)
-    print("NR-U: ", nr_plr)
-    print("C1: ", c1_plr, "C2: ", c2_plr, "C3: ", c3_plr, "C4: ", c4_plr)
-    print("")
     print(
         f"SEED = {seed} N_stations:={sum(number_of_stations.values())} N_gNB:={sum(number_of_gnb.values())}  CW_MIN = {config.cw_min} CW_MAX = {config.cw_max} "
         f"WiFi pcol:={p_coll} WiFi cot:={normalized_channel_occupancy_time} WiFi eff:={normalized_channel_efficiency} "
         f"gNB pcol:={p_coll_NR} gNB cot:={normalized_channel_occupancy_time_NR} gNB eff:={normalized_channel_efficiency_NR} "
         f" all cot:={normalized_channel_occupancy_time_all} all eff:={normalized_channel_efficiency_all}"
     )
-    print(f" Wifi succ: {channel.succeeded_transmissions} fail: {channel.failed_transmissions}")
-    print(f" NR succ: {channel.succeeded_transmissions_NR} fail: {channel.failed_transmissions_NR}")
+    print("")
+    print("THROUGHPUT")
+    print(" VO: ", thrpt_vo, " VI: ",thrpt_vi, " BE: ",thrpt_be, " BK: ",thrpt_bk)
+    print(" C1: ", thrpt_c1, " C2: ", thrpt_c2, " C3: ", thrpt_c3, " C4: ", thrpt_c4)
+    print("")
+    print("AIR TIME")
+    print(" VO: ",airtime_vo," VI: ",airtime_vi," BE: ",airtime_be," BK: ",airtime_bk)
+    print(" C1: ", airtime_c1, "C2: ", airtime_c2, "C3: ", airtime_c3, "C4: ", airtime_c4)
+    print("")
+    print("LATENCY")
+    print("WiFi: ", avg_latency_wifi)
+    print("VO: ",avg_latency_vo, "VI: ",avg_latency_vi, "BE: ",avg_latency_be, "BK: ",avg_latency_bk)
+    print("NR-U: ", avg_latency_nru)
+    print("C1: ", avg_latency_c1, "C2: ", avg_latency_c2, "C3: ", avg_latency_c3, "C4: ", avg_latency_c4)
+    print("")
+    print("JITTER")
+    print("WiFi: ", jitter_wifi)
+    print("VO: ", jitter_vo, "VI: ", jitter_vi, "BE: ", jitter_be, "BK: ", jitter_bk)
+    print("NR-U: ", jitter_nru)
+    print("C1: ", jitter_c1, "C2: ", jitter_c2, "C3: ", jitter_c3, "C4: ", jitter_c4)
+    print("")
+    print("Packet Loss Ratio")
+    print("WiFi: ", plr_wifi)
+    print("VO: ", plr_vo, "VI: ", plr_vi, "BE: ", plr_be, "BK: ", plr_bk)
+    print("NR-U: ", plr_nr)
+    print("C1: ", plr_c1, "C2: ", plr_c2, "C3: ", plr_c3, "C4: ", plr_c4)
+    print("")
+    print(f"WiFi succ: {channel.succeeded_transmissions} fail: {channel.failed_transmissions}")
+    print(f"NR succ: {channel.succeeded_transmissions_NR} fail: {channel.failed_transmissions_NR}")
     print("WiFi throughput", (channel.succeeded_transmissions * config.data_size * 8) / (simulation_time * 1000000))
     print("payload:",config.data_size)
     print("lambda:", poisson_lambda)
@@ -1209,26 +1301,27 @@ def run_simulation(
         write_header = False
     with open(output_csv, mode='a', newline="") as result_file:
         result_adder = csv.writer(result_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
-        firstliner='Seed,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcollWiFi,ChannelOccupancyNR,ChannelEfficiencyNR,PcollNR,ChannelOccupancyAll,ChannelEfficiencyAll,' \
-                   'Throughput,Payload,SimulationTime,JainFairIndex,beAirTime,vdAirTime,vcAirTime,bgAirTime,lambda,thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,cw_min,mcs,retryLimit,sync,' \
-                   'lenLte,distribution_k,nMPDU,nss,buffer,c1AirTime,c2AirTime,c3AirTime,c4AirTime,thrpt_c1,thrpt_c2,thrpt_c3,thrpt_c4,' \
-                   'latency_wifi,latency_nru,latency_bg,latency_be,latency_vd,latency_vc,latency_c1,latency_c2,latency_c3,latency_c4,jitter_wifi,jitter_be,jitter_bg,jitter_vd,jitter_vc,' \
-                   'jitter_nru,jitter_c1,jitter_c2,jitter_c3,jitter_c4,wifi_plr,be_plr,bg_plr,vd_plr,vo_plr,nr_plr,c1_plr,c2_plr,c3_plr,c4_plr'
+        firstliner='Seed,Nodes,WiFi,Gnb,ChannelOccupancyWiFi,ChannelEfficiencyWiFi,PcollWiFi,ChannelOccupancyNR,ChannelEfficiencyNR,PcollNR,ChannelOccupancyAll,ChannelEfficiencyAll,' \
+                   'Throughput,Payload,SimulationTime,JainFairIndex,airtime_be,airtime_vi,airtime_vo,airtime_bk,lambda,thrpt_vo,thrpt_vi,thrpt_be,thrpt_bk,cw_min,mcs,retryLimit,sync,' \
+                   'lenLte,distribution_k,nMPDU,nss,buffer,airtime_c1,airtime_c2,airtime_c3,airtime_c4,thrpt_c1,thrpt_c2,thrpt_c3,thrpt_c4,' \
+                   'latency_wifi,latency_nru,latency_bk,latency_be,latency_vi,latency_vo,latency_c1,latency_c2,latency_c3,latency_c4,jitter_wifi,jitter_be,jitter_bk,jitter_vi,jitter_vo,' \
+                   'jitter_nru,jitter_c1,jitter_c2,jitter_c3,jitter_c4,plr_wifi,plr_be,plr_bk,plr_vi,plr_vo,plr_nr,plr_c1,plr_c2,plr_c3,plr_c4'
 
         if write_header:
             result_adder.writerow([firstliner.strip('"')])
 
         result_adder.writerow(
-            [seed, sum(number_of_stations.values()), sum(number_of_gnb.values()), normalized_channel_occupancy_time, normalized_channel_efficiency,
+            [seed,sum(number_of_stations.values())+sum(number_of_gnb.values()),sum(number_of_stations.values()), sum(number_of_gnb.values()), normalized_channel_occupancy_time, normalized_channel_efficiency,
              p_coll,
              normalized_channel_occupancy_time_NR, normalized_channel_efficiency_NR, p_coll_NR,
              normalized_channel_occupancy_time_all, normalized_channel_efficiency_all,throughput,
-             config.data_size,simulation_time,jain_fair_index,beAirTime,vdAirTime,vcAirTime,bgAirTime,poisson_lambda,
-             thrpt_vc,thrpt_vd,thrpt_be,thrpt_bg,config.cw_min,config.mcs,config.r_limit,config_nr.synchronization_slot_duration,
-             transtime,distribution_k,nMPDU,nSS,buffer_size,c1AirTime,c2AirTime,c3AirTime,
-             c4AirTime,thrpt_c1,thrpt_c2,thrpt_c3,thrpt_c4,avg_latency_wifi,avg_latency_nru,avg_latency_bg,avg_latency_be,
-             avg_latency_vd,avg_latency_vc,avg_latency_c1,avg_latency_c2,avg_latency_c3,avg_latency_c4,jitter_wifi,jitter_be,jitter_bg,jitter_vd,jitter_vc,jitter_nru,jitter_c1,
-             jitter_c2,jitter_c3,jitter_c4,wifi_plr,be_plr,bg_plr,vd_plr,vo_plr,nr_plr,c1_plr,c2_plr,c3_plr,c4_plr])
+             config.data_size,simulation_time,jain_fair_index,airtime_be,airtime_vi,airtime_vo,airtime_bk,poisson_lambda,
+             thrpt_vo,thrpt_vi,thrpt_be,thrpt_bk,config.cw_min,config.mcs,config.r_limit,config_nr.synchronization_slot_duration,
+             transtime,distribution_k,nMPDU,nSS,buffer_size,airtime_c1,airtime_c2,airtime_c3,
+             airtime_c4,thrpt_c1,thrpt_c2,thrpt_c3,thrpt_c4,avg_latency_wifi,avg_latency_nru,avg_latency_bk,avg_latency_be,
+             avg_latency_vi,avg_latency_vo,avg_latency_c1,avg_latency_c2,avg_latency_c3,avg_latency_c4,jitter_wifi,jitter_be,
+             jitter_bk,jitter_vi,jitter_vo,jitter_nru,jitter_c1,
+             jitter_c2,jitter_c3,jitter_c4,plr_wifi,plr_be,plr_bk,plr_vi,plr_vo,plr_nr,plr_c1,plr_c2,plr_c3,plr_c4])
 
 
 
