@@ -27,6 +27,7 @@ My Master thesis is focused on the Quality of Service aspects of the above menti
 - Arbitrary buffer size management
 - QoS metrics (throughput, latency, packet loss ratio, jitter)
 - Packet dropping based on the latency thresholds 
+- Limiting channel occupancy
 
 ### How to run?
 
