@@ -26,7 +26,10 @@ My Master thesis is focused on the Quality of Service aspects of the above menti
 - NR-U Access Categories
 - Arbitrary buffer size management
 - QoS metrics (throughput, latency, packet loss ratio, jitter)
-- Packet dropping based on the latency thresholds 
+- Packet dropping based on the latency thresholds
+- Channel reservation overview 
+- Limiting channel occupancy techniques
+- Delaying channel access methods
 
 ### How to run?
 
